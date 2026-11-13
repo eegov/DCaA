@@ -1,0 +1,16 @@
+#!/bin/sh
+# Git-хук pre-commit: работает и для человека, и для агента (агент видит текст отказа в выводе git).
+branch=$(git branch --show-current)
+case "$branch" in
+  master|dev)
+    echo "pre-commit: прямые коммиты в $branch запрещены. Создай ветку: git switch -c feature/<имя> dev"
+    exit 1 ;;
+esac
+
+if git diff --cached --name-only | grep -qE '(^|/)\.env$'; then
+  echo "pre-commit: .env содержит локальные пароли и не коммитится. Значения-примеры храни в .env.example"
+  exit 1
+fi
+
+# Пробелы в конце строк и маркеры незавершённого merge-конфликта.
+git diff --cached --check

@@ -1,0 +1,13 @@
+#!/bin/sh
+# Git-хук commit-msg: сообщение коммита в формате Conventional Commits, например
+#   feat(students): add course transfer endpoint
+#   fix(api): return 409 for duplicate record book
+first_line=$(head -n 1 "$1")
+case "$first_line" in
+  Merge*) exit 0 ;;
+esac
+if ! echo "$first_line" | grep -qE '^(feat|fix|refactor|test|docs|build|chore)(\([a-z0-9-]+\))?: .+'; then
+  echo "commit-msg: нужен формат Conventional Commits: <тип>(<область>): <что сделано>"
+  echo "  типы: feat fix refactor test docs build chore; получено: $first_line"
+  exit 1
+fi
