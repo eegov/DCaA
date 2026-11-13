@@ -39,10 +39,15 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                                                                   WebRequest request) {
         Map<String, String> errors = new LinkedHashMap<>();
         for (FieldError error : exception.getBindingResult().getFieldErrors()) {
-            errors.putIfAbsent(error.getField(), error.getDefaultMessage());
+            errors.putIfAbsent(jsonFieldName(error.getField()), error.getDefaultMessage());
         }
         ProblemDetail body = exception.getBody();
         body.setProperty("errors", errors);
         return handleExceptionInternal(exception, body, headers, status, request);
+    }
+
+    /** JSON запросов плоский, поэтому путь Java-объекта personalData.lastName показываем клиенту как lastName. */
+    private static String jsonFieldName(String path) {
+        return path.substring(path.lastIndexOf('.') + 1);
     }
 }

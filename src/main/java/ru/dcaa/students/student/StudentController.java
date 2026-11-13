@@ -52,7 +52,7 @@ class StudentController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Изменить номер зачётки, ФИО и группу")
-    StudentResponse update(@PathVariable long id, @Valid @RequestBody UpdateStudentRequest request) {
+    StudentResponse update(@PathVariable long id, @Valid @RequestBody PersonalData request) {
         return StudentResponse.from(service.update(id, request));
     }
 
