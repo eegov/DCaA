@@ -5,14 +5,15 @@
 # Хук срабатывает при git merge --no-ff (при fast-forward merge-коммита нет).
 [ "$(git branch --show-current)" = "dev" ] || exit 0
 
-merged=$(git name-rev --name-only --refs='refs/heads/*' "$(cat "$(git rev-parse --git-dir)/MERGE_HEAD")")
+# git merge кладёт в GIT_REFLOG_ACTION строку "merge <ветка>"; MERGE_HEAD в этот момент ещё не записан.
+merged=${GIT_REFLOG_ACTION#merge }
 case "$merged" in
   feature/*|fix/*) ;;
   *) exit 0 ;;
 esac
 
 report="docs/reviews/$(echo "$merged" | tr '/' '-').md"
-if ! git cat-file -e "MERGE_HEAD:$report" 2>/dev/null; then
+if ! git cat-file -e "$merged:$report" 2>/dev/null; then
   echo "pre-merge-commit: в ветке $merged нет отчёта ревью $report."
   echo "Запусти скилл code-review, закрой блокирующие замечания и закоммить отчёт в ветку."
   exit 1
