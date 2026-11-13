@@ -2,29 +2,26 @@
 
 ## 1. Каркас и миграция
 
-- [x] 1.1 Maven-проект Spring Boot (web, data-jpa, validation, liquibase, postgresql, springdoc, actuator); `./mvnw -q compile` проходит
-- [ ] 1.2 Changeset `001-create-students.sql` и `application.yaml` с `ddl-auto: validate`; `MigrationIT` проверяет, что в БД ровно `students` и служебные таблицы Liquibase
+- [x] 1.1 Maven-проект Spring Boot (webmvc, data-jpa, validation, liquibase, postgresql, springdoc); `./mvnw -q compile` проходит
+- [x] 1.2 Changeset `001-create-students.sql` и `application.yaml` с `ddl-auto: validate`; `MigrationIT` проверяет, что в БД ровно `students` и служебные таблицы Liquibase
 
 ## 2. Учёт студентов
 
-- [ ] 2.1 Сущность, репозиторий, сервис и контроллер для приёма, списка, просмотра, редактирования, перевода, отчисления и удаления; `StudentApiIT` покрывает сценарии `student-records`
-- [ ] 2.2 Обработка ошибок ProblemDetail (400 с полями, 404, 409, 405); сценарии «Формат ошибок» проходят в `StudentApiIT`
-- [ ] 2.3 Swagger UI и OpenAPI; `StudentApiIT` проверяет наличие путей в `/v3/api-docs`
+- [x] 2.1 Сущность, репозиторий, сервис и контроллер для приёма, списка, просмотра, редактирования, перевода, отчисления и удаления; `StudentApiIT` покрывает сценарии `student-records`
+- [x] 2.2 Обработка ошибок ProblemDetail (400 с полями, 404, 409, 405); сценарии «Формат ошибок» проходят в `StudentApiIT`
+- [x] 2.3 Swagger UI и OpenAPI; `StudentApiIT` проверяет `/swagger-ui.html` и пути в `/v3/api-docs`
+- [x] 2.4 Правила состояния в сущности `Student`; unit-тест `StudentTest` проходит в `./mvnw test` без Docker
 
 ## 3. Запуск
 
 - [ ] 3.1 `Dockerfile` (многоступенчатая сборка) и `compose.yaml` (db + app в сети `students`); ручная проверка: `docker compose --profile app up -d --build`, затем `GET /api/students` отвечает 200
 - [ ] 3.2 Локальный режим; ручная проверка: `docker compose up -d db`, `.\mvnw.cmd spring-boot:run`, `GET /api/students` отвечает 200
-- [x] 3.3 README: требования к окружению, оба режима запуска, Swagger; команды из README выполняются как написано
+- [ ] 3.3 README: требования к окружению, оба режима запуска, Swagger; команды из README выполняются как написано
 
 ## 4. Проверка
 
-> Состояние на момент реализации: код и тесты компилируются; поведение проверено вручную (curl) на JVM
-> против PostgreSQL 17 без Docker, все коды ответов совпали со сценариями. Интеграционные тесты не запускались:
-> в окружении агента нет Docker. Задачи 1.2, 2.1–2.3, 3.1, 3.2, 4.1 отмечаются после запуска на машине разработчика.
 
-
-- [ ] 4.1 `./mvnw verify` проходит
+- [ ] 4.1 `./mvnw verify` проходит на машине с Docker (Testcontainers)
 - [ ] 4.2 Ревью в чистом контексте (скилл code-review), отчёт `docs/reviews/feature-lab1-students.md` без blocker и major
 
 ## Workflow follow-up
