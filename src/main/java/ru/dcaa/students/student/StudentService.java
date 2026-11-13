@@ -1,6 +1,8 @@
 package ru.dcaa.students.student;
 
 import java.util.List;
+import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -11,6 +13,9 @@ import ru.dcaa.students.error.NotFoundException;
 @Transactional
 class StudentService {
 
+    /** Имя ограничения уникальности из 001-create-students.sql. */
+    private static final String RECORD_BOOK_CONSTRAINT = "uq_students_record_book";
+
     private final StudentRepository repository;
 
     StudentService(StudentRepository repository) {
@@ -18,11 +23,7 @@ class StudentService {
     }
 
     Student admit(AdmitStudentRequest request) {
-        if (repository.existsByRecordBookNumber(request.recordBookNumber())) {
-            throw duplicateRecordBook(request.recordBookNumber());
-        }
-        return repository.save(new Student(request.recordBookNumber(), request.lastName(), request.firstName(),
-                request.middleName(), request.groupName(), request.course()));
+        return saveChecked(new Student(request.personalData(), request.course()), request.personalData());
     }
 
     @Transactional(readOnly = true)
@@ -36,18 +37,14 @@ class StudentService {
                 .orElseThrow(() -> new NotFoundException("Студент " + id + " не найден"));
     }
 
-    Student update(long id, UpdateStudentRequest request) {
-        Student student = getActive(id);
-        if (repository.existsByRecordBookNumberAndIdNot(request.recordBookNumber(), id)) {
-            throw duplicateRecordBook(request.recordBookNumber());
-        }
-        student.updatePersonalData(request.recordBookNumber(), request.lastName(), request.firstName(),
-                request.middleName(), request.groupName());
-        return student;
+    Student update(long id, PersonalData data) {
+        Student student = get(id);
+        student.updatePersonalData(data);
+        return saveChecked(student, data);
     }
 
     Student transfer(long id, TransferStudentRequest request) {
-        Student student = getActive(id);
+        Student student = get(id);
         student.transfer(request.course(), request.groupName());
         return student;
     }
@@ -62,15 +59,20 @@ class StudentService {
         repository.delete(get(id));
     }
 
-    private Student getActive(long id) {
-        Student student = get(id);
-        if (student.getStatus() == StudentStatus.EXPELLED) {
-            throw new ConflictException("Студент " + id + " отчислен, изменение невозможно");
+    /**
+     * Уникальность номера зачётки проверяет БД: отдельная проверка «есть ли такой» перед вставкой
+     * не защищает от двух одновременных запросов. flush выполняет SQL сразу, чтобы нарушение
+     * ограничения пришло сюда, а не при коммите транзакции за пределами сервиса.
+     */
+    private Student saveChecked(Student student, PersonalData data) {
+        try {
+            return repository.saveAndFlush(student);
+        } catch (DataIntegrityViolationException exception) {
+            if (exception.getCause() instanceof ConstraintViolationException violation
+                    && RECORD_BOOK_CONSTRAINT.equals(violation.getConstraintName())) {
+                throw new ConflictException("Номер зачётки " + data.recordBookNumber() + " уже занят");
+            }
+            throw exception;
         }
-        return student;
-    }
-
-    private static ConflictException duplicateRecordBook(String recordBookNumber) {
-        return new ConflictException("Номер зачётки " + recordBookNumber + " уже занят");
     }
 }
