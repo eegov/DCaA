@@ -17,7 +17,7 @@ import org.springframework.test.web.servlet.assertj.MvcTestResult;
 
 /**
  * Сценарии спецификаций student-records и service-runtime (документация API).
- * Каждый тест проверяет статус, тело ответа и, где запись должна измениться или нет, состояние БД.
+ * Каждый тест проверяет статус, тело ответа и состояние БД: изменилась запись или осталась прежней.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -39,12 +39,14 @@ class StudentApiIT {
 
     @Test
     void admitCreatesActiveStudent() {
-        MvcTestResult result = post("/api/students", admitJson("100", 4));
+        MvcTestResult result = post("/api/students", admitJson("100"));
 
         assertThat(result).hasStatus(HttpStatus.CREATED);
         assertThat(result).headers().hasValue("Location", "http://localhost/api/students/1");
+        assertThat(result).bodyJson().extractingPath("$.id").isEqualTo(1);
         assertThat(result).bodyJson().extractingPath("$.status").isEqualTo("ACTIVE");
-        assertThat(row(1)).containsEntry("last_name", "Иванов").containsEntry("course", 4);
+        assertThat(row(1)).containsEntry("last_name", "Иванов").containsEntry("course", 4)
+                .containsEntry("status", "ACTIVE");
     }
 
     @Test
@@ -56,9 +58,8 @@ class StudentApiIT {
 
         MvcTestResult result = post("/api/students", json);
 
-        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
-        assertThat(result).bodyJson().extractingPath("$.errors.lastName").isNotNull();
-        assertThat(result).bodyJson().extractingPath("$.errors.course").isNotNull();
+        assertProblem(result, HttpStatus.BAD_REQUEST);
+        assertThat(result).bodyJson().extractingPath("$.errors").asMap().containsOnlyKeys("lastName", "course");
         assertThat(count()).isZero();
     }
 
@@ -66,9 +67,9 @@ class StudentApiIT {
     void admitWithTakenRecordBookReturns409() {
         admit("100");
 
-        MvcTestResult result = post("/api/students", admitJson("100", 1));
+        MvcTestResult result = post("/api/students", admitJson("100"));
 
-        assertThat(result).hasStatus(HttpStatus.CONFLICT);
+        assertProblem(result, HttpStatus.CONFLICT);
         assertThat(count()).isEqualTo(1);
     }
 
@@ -78,7 +79,7 @@ class StudentApiIT {
     void listReturnsAllStudentsInCreationOrderIncludingExpelled() {
         admit("100");
         long second = admit("200");
-        post("/api/students/" + second + "/expel", null);
+        expel(second);
 
         MvcTestResult result = mvc.get().uri("/api/students").exchange();
 
@@ -95,11 +96,12 @@ class StudentApiIT {
 
         assertThat(result).hasStatusOk();
         assertThat(result).bodyJson().extractingPath("$.recordBookNumber").isEqualTo("100");
+        assertThat(result).bodyJson().extractingPath("$.groupName").isEqualTo("ПИбд-41");
     }
 
     @Test
     void getUnknownReturns404() {
-        assertThat(mvc.get().uri("/api/students/999").exchange()).hasStatus(HttpStatus.NOT_FOUND);
+        assertProblem(mvc.get().uri("/api/students/999").exchange(), HttpStatus.NOT_FOUND);
     }
 
     // --- Редактирование ---
@@ -111,6 +113,8 @@ class StudentApiIT {
         MvcTestResult result = put("/api/students/" + id, updateJson("101"));
 
         assertThat(result).hasStatusOk();
+        assertThat(result).bodyJson().extractingPath("$.lastName").isEqualTo("Петров");
+        assertThat(result).bodyJson().extractingPath("$.course").isEqualTo(4);
         assertThat(row(id)).containsEntry("record_book_number", "101")
                 .containsEntry("last_name", "Петров")
                 .containsEntry("group_name", "ПИбд-42")
@@ -119,23 +123,20 @@ class StudentApiIT {
 
     @Test
     void updateWithCourseFieldReturns400AndKeepsRecord() {
-        long id = admit("100");
-        String json = updateJson("101").replace("}", ", \"course\": 1}");
+        assertUpdateWithExtraFieldIsRejected("\"course\": 1");
+    }
 
-        MvcTestResult result = put("/api/students/" + id, json);
-
-        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST);
-        assertThat(row(id)).containsEntry("record_book_number", "100").containsEntry("course", 4);
+    @Test
+    void updateWithStatusFieldReturns400AndKeepsRecord() {
+        assertUpdateWithExtraFieldIsRejected("\"status\": \"ACTIVE\"");
     }
 
     @Test
     void updateExpelledReturns409() {
         long id = admit("100");
-        post("/api/students/" + id + "/expel", null);
+        expel(id);
 
-        MvcTestResult result = put("/api/students/" + id, updateJson("101"));
-
-        assertThat(result).hasStatus(HttpStatus.CONFLICT);
+        assertProblem(put("/api/students/" + id, updateJson("101")), HttpStatus.CONFLICT);
         assertThat(row(id)).containsEntry("record_book_number", "100");
     }
 
@@ -144,9 +145,7 @@ class StudentApiIT {
         admit("100");
         long id = admit("200");
 
-        MvcTestResult result = put("/api/students/" + id, updateJson("100"));
-
-        assertThat(result).hasStatus(HttpStatus.CONFLICT);
+        assertProblem(put("/api/students/" + id, updateJson("100")), HttpStatus.CONFLICT);
         assertThat(row(id)).containsEntry("record_book_number", "200");
     }
 
@@ -156,21 +155,28 @@ class StudentApiIT {
     void transferChangesCourseAndGroup() {
         long id = admit("100");
 
-        MvcTestResult result = post("/api/students/" + id + "/transfer", "{\"course\": 3, \"groupName\": \"ПИбд-31\"}");
+        MvcTestResult result = transfer(id, 3);
 
         assertThat(result).hasStatusOk();
         assertThat(result).bodyJson().extractingPath("$.course").isEqualTo(3);
+        assertThat(result).bodyJson().extractingPath("$.groupName").isEqualTo("ПИбд-31");
         assertThat(row(id)).containsEntry("course", 3).containsEntry("group_name", "ПИбд-31");
+    }
+
+    @Test
+    void transferToCurrentCourseReturns409() {
+        long id = admit("100");
+
+        assertProblem(transfer(id, 4), HttpStatus.CONFLICT);
+        assertThat(row(id)).containsEntry("course", 4).containsEntry("group_name", "ПИбд-41");
     }
 
     @Test
     void transferExpelledReturns409() {
         long id = admit("100");
-        post("/api/students/" + id + "/expel", null);
+        expel(id);
 
-        MvcTestResult result = post("/api/students/" + id + "/transfer", "{\"course\": 3, \"groupName\": \"ПИбд-31\"}");
-
-        assertThat(result).hasStatus(HttpStatus.CONFLICT);
+        assertProblem(transfer(id, 3), HttpStatus.CONFLICT);
         assertThat(row(id)).containsEntry("course", 4);
     }
 
@@ -180,23 +186,26 @@ class StudentApiIT {
     void expelKeepsRecordWithCourseAndGroup() {
         long id = admit("100");
 
-        MvcTestResult result = post("/api/students/" + id + "/expel", null);
+        MvcTestResult result = expel(id);
 
         assertThat(result).hasStatusOk();
+        assertThat(result).bodyJson().extractingPath("$.status").isEqualTo("EXPELLED");
         assertThat(row(id)).containsEntry("status", "EXPELLED")
                 .containsEntry("course", 4)
                 .containsEntry("group_name", "ПИбд-41");
     }
 
     @Test
-    void repeatedExpelReturns200() {
+    void repeatedExpelReturns200AndKeepsRecord() {
         long id = admit("100");
-        post("/api/students/" + id + "/expel", null);
+        expel(id);
+        Map<String, Object> before = row(id);
 
-        MvcTestResult result = post("/api/students/" + id + "/expel", null);
+        MvcTestResult result = expel(id);
 
         assertThat(result).hasStatusOk();
         assertThat(result).bodyJson().extractingPath("$.status").isEqualTo("EXPELLED");
+        assertThat(row(id)).isEqualTo(before);
     }
 
     // --- Удаление ---
@@ -206,50 +215,81 @@ class StudentApiIT {
         long id = admit("100");
 
         assertThat(mvc.delete().uri("/api/students/{id}", id).exchange()).hasStatus(HttpStatus.NO_CONTENT);
-        assertThat(mvc.get().uri("/api/students/{id}", id).exchange()).hasStatus(HttpStatus.NOT_FOUND);
+        assertProblem(mvc.get().uri("/api/students/{id}", id).exchange(), HttpStatus.NOT_FOUND);
         assertThat(count()).isZero();
     }
 
     // --- Формат ошибок ---
 
     @Test
-    void malformedJsonReturns400ProblemDetail() {
-        MvcTestResult result = post("/api/students", "это не JSON");
+    void malformedJsonReturns400() {
+        assertProblem(post("/api/students", "это не JSON"), HttpStatus.BAD_REQUEST);
+    }
 
-        assertThat(result).hasStatus(HttpStatus.BAD_REQUEST).hasContentType(MediaType.APPLICATION_PROBLEM_JSON);
-        assertThat(result).bodyJson().extractingPath("$.status").isEqualTo(400);
+    @Test
+    void unknownFieldReturns400() {
+        String json = admitJson("100").replace("}", ", \"extra\": 1}");
+
+        assertProblem(post("/api/students", json), HttpStatus.BAD_REQUEST);
+        assertThat(count()).isZero();
     }
 
     @Test
     void unsupportedMethodReturns405() {
         long id = admit("100");
 
-        assertThat(mvc.patch().uri("/api/students/{id}", id).exchange()).hasStatus(HttpStatus.METHOD_NOT_ALLOWED);
+        assertProblem(mvc.patch().uri("/api/students/{id}", id).exchange(), HttpStatus.METHOD_NOT_ALLOWED);
     }
 
     // --- Документация API ---
 
     @Test
-    void openApiDescribesStudentEndpoints() {
-        MvcTestResult result = mvc.get().uri("/v3/api-docs").exchange();
-
-        assertThat(result).hasStatusOk();
-        assertThat(result).bodyJson().extractingPath("$.paths").asMap()
-                .containsKeys("/api/students", "/api/students/{id}");
+    void swaggerAndOpenApiAreAvailable() {
+        assertThat(mvc.get().uri("/swagger-ui.html").exchange())
+                .hasStatus(HttpStatus.FOUND).hasRedirectedUrl("/swagger-ui/index.html");
         assertThat(mvc.get().uri("/swagger-ui/index.html").exchange()).hasStatusOk();
+
+        MvcTestResult openApi = mvc.get().uri("/v3/api-docs").exchange();
+        assertThat(openApi).hasStatusOk();
+        assertThat(openApi).bodyJson().extractingPath("$.paths").asMap()
+                .containsKeys("/api/students", "/api/students/{id}");
     }
 
     // --- Вспомогательные методы ---
 
+    /** Ошибка в формате RFC 9457: нужный статус, тип application/problem+json, поля status, title, detail. */
+    private static void assertProblem(MvcTestResult result, HttpStatus status) {
+        assertThat(result).hasStatus(status).hasContentType(MediaType.APPLICATION_PROBLEM_JSON);
+        assertThat(result).bodyJson().extractingPath("$.status").isEqualTo(status.value());
+        assertThat(result).bodyJson().extractingPath("$.title").isNotNull();
+        assertThat(result).bodyJson().extractingPath("$.detail").isNotNull();
+    }
+
+    private void assertUpdateWithExtraFieldIsRejected(String extraField) {
+        long id = admit("100");
+        String json = updateJson("101").replace("}", ", " + extraField + "}");
+
+        assertProblem(put("/api/students/" + id, json), HttpStatus.BAD_REQUEST);
+        assertThat(row(id)).containsEntry("record_book_number", "100").containsEntry("course", 4);
+    }
+
     private long admit(String recordBookNumber) {
-        post("/api/students", admitJson(recordBookNumber, 4));
+        assertThat(post("/api/students", admitJson(recordBookNumber))).hasStatus(HttpStatus.CREATED);
         return jdbc.queryForObject("select id from students where record_book_number = ?", Long.class,
                 recordBookNumber);
     }
 
+    private MvcTestResult expel(long id) {
+        return mvc.post().uri("/api/students/{id}/expel", id).exchange();
+    }
+
+    private MvcTestResult transfer(long id, int course) {
+        return post("/api/students/" + id + "/transfer",
+                "{\"course\": %d, \"groupName\": \"ПИбд-%d1\"}".formatted(course, course));
+    }
+
     private MvcTestResult post(String uri, String json) {
-        var request = mvc.post().uri(uri);
-        return json == null ? request.exchange() : request.contentType(MediaType.APPLICATION_JSON).content(json).exchange();
+        return mvc.post().uri(uri).contentType(MediaType.APPLICATION_JSON).content(json).exchange();
     }
 
     private MvcTestResult put(String uri, String json) {
@@ -264,11 +304,11 @@ class StudentApiIT {
         return jdbc.queryForObject("select count(*) from students", Long.class);
     }
 
-    private static String admitJson(String recordBookNumber, int course) {
+    private static String admitJson(String recordBookNumber) {
         return """
                 {"recordBookNumber": "%s", "lastName": "Иванов", "firstName": "Иван",
-                 "middleName": "Иванович", "groupName": "ПИбд-41", "course": %d}
-                """.formatted(recordBookNumber, course);
+                 "middleName": "Иванович", "groupName": "ПИбд-41", "course": 4}
+                """.formatted(recordBookNumber);
     }
 
     private static String updateJson(String recordBookNumber) {
