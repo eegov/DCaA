@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: students
+  # Локальный запуск берёт те же значения, что и Compose. Переменные окружения важнее файла.
+  config:
+    import: optional:file:.env[.properties]
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:students}
+    username: ${DB_USER:students}
+    password: ${DB_PASSWORD:students}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
