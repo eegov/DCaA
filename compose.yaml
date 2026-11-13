@@ -1,0 +1,47 @@
+name: dcaa
+
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: ${DB_NAME:-students}
+      POSTGRES_USER: ${DB_USER:-students}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-students}
+    ports:
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
+    volumes:
+      - students-data:/var/lib/postgresql/data
+    networks:
+      - students
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 2s
+      retries: 30
+
+  # Профиль app: без него `docker compose up` поднимает только БД (режим локального запуска сервиса).
+  app:
+    profiles: [app]
+    build: .
+    environment:
+      DB_HOST: db          # имя сервиса БД в сети students
+      DB_PORT: "5432"      # порт внутри сети, а не опубликованный на хосте
+      DB_NAME: ${DB_NAME:-students}
+      DB_USER: ${DB_USER:-students}
+      DB_PASSWORD: ${DB_PASSWORD:-students}
+    ports:
+      - "127.0.0.1:${APP_PORT:-8080}:8080"
+    networks:
+      - students
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8080/actuator/health"]
+      interval: 5s
+      retries: 24
+
+networks:
+  students:
+
+volumes:
+  students-data:
