@@ -19,7 +19,8 @@
 | Отчислить (запись остаётся) | `POST /api/students/{id}/expel` |
 | Удалить запись | `DELETE /api/students/{id}` |
 
-Курс от 1 до 6, статус `ACTIVE` или `EXPELLED`. Отчисленного нельзя редактировать и переводить.
+Курс от 1 до 6, статус `ACTIVE` или `EXPELLED`. Отчисленного нельзя редактировать и переводить,
+перевод возможен только на другой курс. Поля, которых нет в описании операции, отклоняются.
 Ошибки возвращаются в формате `application/problem+json`: 400 некорректные данные, 404 нет студента, 409 конфликт.
 
 В БД одна таблица `students`. Её создаёт Liquibase при старте
@@ -46,6 +47,7 @@ docker compose up -d db
 .\mvnw.cmd spring-boot:run        # Linux/macOS: ./mvnw spring-boot:run
 ```
 
+Проверка: `curl.exe http://localhost:8080/api/students` возвращает `[]` (или список студентов).
 Swagger UI: http://localhost:8080/swagger-ui.html
 
 Остановить с сохранением данных: `docker compose --profile app down`.
@@ -56,11 +58,10 @@ Swagger UI: http://localhost:8080/swagger-ui.html
 ```powershell
 .\mvnw.cmd verify
 ```
-Интеграционные тесты поднимают свою PostgreSQL через Testcontainers, поэтому нужен запущенный Docker.
-Рабочую БД тесты не трогают.
+`StudentTest` проверяет правила без БД. Интеграционные `*IT` поднимают свою PostgreSQL через Testcontainers,
+поэтому нужен запущенный Docker. Рабочую БД тесты не трогают.
 
 ## Почему такой стек
 
-Java 21 и Spring Boot выбраны под всю серию лабораторных: в лабах 3 и 6 нужны `RestTemplate`
-и `CompletableFuture`, это API из мира Java/Spring. PostgreSQL даёт ограничения целостности на уровне БД.
-Подробнее о решениях: [design.md](openspec/changes/archive/) изменения `lab1-students-service`.
+Java 21 и Spring Boot выбраны под всю серию: в лабах 3 и 6 нужны `RestTemplate` и `CompletableFuture`.
+Остальные решения с причинами: `design.md` изменения `lab1-students-service` в `openspec/changes/archive/`.
