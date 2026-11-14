@@ -28,8 +28,12 @@
 
 ## Что нужно установить
 
-- Docker Desktop (Compose v2)
-- JDK 21, только для локального запуска сервиса и тестов. Maven ставить не нужно, есть Maven Wrapper.
+Работает одинаково на Windows, Linux и macOS. Различается только имя Maven Wrapper:
+`.\mvnw.cmd` в PowerShell, `./mvnw` в bash/zsh.
+
+- Docker Desktop или Docker Engine с Compose v2: для режимов с контейнерами и для интеграционных тестов.
+- JDK 21: для запуска сервиса на хосте и тестов. Maven ставить не нужно.
+- PostgreSQL 10+ (проверено на 17): только для режима без Docker.
 
 Настройки по умолчанию лежат в `.env.example`. Если нужно что-то поменять (например, порт 5432 занят),
 скопируй его в `.env`: этот файл читают и Compose, и локально запущенный сервис.
@@ -46,6 +50,14 @@ docker compose --profile app up -d --build
 docker compose up -d db
 .\mvnw.cmd spring-boot:run        # Linux/macOS: ./mvnw spring-boot:run
 ```
+
+**Без Docker** (PostgreSQL установлена на компьютер):
+```powershell
+psql -U postgres -f docs\sql\create-local-db.sql   # один раз: пользователь и БД students
+.\mvnw.cmd spring-boot:run
+```
+Команды для Linux и macOS указаны в начале `docs/sql/create-local-db.sql`. Если PostgreSQL слушает не 5432,
+задай `DB_PORT` в `.env`. Схему, как и в других режимах, создаст Liquibase при старте.
 
 Проверка: `curl.exe http://localhost:8080/api/students` возвращает `[]` (или список студентов).
 Swagger UI: http://localhost:8080/swagger-ui.html
