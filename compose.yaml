@@ -2,7 +2,7 @@ name: dcaa
 
 services:
   db:
-    image: postgres:17
+    image: postgres:18
     environment:
       POSTGRES_DB: ${DB_NAME:-students}
       POSTGRES_USER: ${DB_USER:-students}
@@ -10,7 +10,8 @@ services:
     ports:
       - "127.0.0.1:${DB_PORT:-5432}:5432"
     volumes:
-      - students-data:/var/lib/postgresql/data
+      # С версии 18 образ хранит данные в /var/lib/postgresql/18/docker, volume монтируется уровнем выше
+      - students-data:/var/lib/postgresql
     networks:
       - students
     healthcheck:

@@ -70,7 +70,7 @@ Register → Server:
 ## 4. Допка: миграция и время запроса
 
 Ожидаемое задание: добавить таблицу или индекс новой миграцией и показать, что время запроса изменилось.
-Цифры ниже получены на PostgreSQL 17 при подготовке; на твоей машине будут другие, но порядок тот же.
+Цифры ниже получены на PostgreSQL 18 при подготовке; на твоей машине будут другие, но порядок тот же.
 
 **Шаг 1. Данные.** pgAdmin → Query Tool → открыть `docs/sql/seed-students.sql` → Execute (F5).
 200 000 студентов, 72 группы примерно по 2800 человек.
@@ -79,8 +79,8 @@ Register → Server:
 ```sql
 EXPLAIN ANALYZE SELECT * FROM students WHERE group_name = 'ПИбд-41';
 ```
-Ожидаемо `Seq Scan`, `Rows Removed by Filter: 197222`, `Execution Time` около 18 ms:
-PostgreSQL читает всю таблицу и проверяет каждую строку.
+Ожидаемо `Seq Scan`, `Rows Removed by Filter: 197222`, `Buffers: shared hit=2497`, `Execution Time` около 14 ms:
+PostgreSQL читает все 2497 страниц таблицы (по 8 КБ) и проверяет каждую строку.
 
 **Шаг 3. Миграция через агента.** В Claude Code:
 ```
@@ -99,7 +99,13 @@ CREATE INDEX idx_students_group_name ON students (group_name);
 `ChangeSet db/changelog/002-... ran successfully in N ms`, в `databasechangelog` появилась вторая строка.
 
 **Шаг 4. Замер после:** тот же `EXPLAIN ANALYZE`. Ожидаемо `Bitmap Index Scan on idx_students_group_name`
-и около 3 ms. PostgreSQL находит нужные строки по индексу (B-дерево) и читает только их.
+и около 2 ms. PostgreSQL находит адреса нужных строк в индексе (B-дерево, `Buffers: shared hit=5`:
+пять страниц индекса), собирает их в битовую карту страниц и читает только эти страницы.
+
+Почему выигрыш около 6 раз, а не в сотни: строки одной группы разбросаны по всем страницам таблицы
+(`Heap Blocks: exact=2497`), поэтому страниц таблицы читается столько же. Экономия в том, что не нужно
+проверять 197 тысяч чужих строк. Если спросят, как ускорить сильнее: `CLUSTER students USING idx_students_group_name`
+физически упорядочит строки по группе, и читать придётся десятки страниц вместо тысяч.
 
 Если просят новую **таблицу**, порядок тот же: новый changeset с `CREATE TABLE` и `--rollback DROP TABLE`,
 при необходимости JPA-сущность (без неё `ddl-auto: validate` таблицу просто не проверяет), замер запроса
