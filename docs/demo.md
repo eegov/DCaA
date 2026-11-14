@@ -1,5 +1,11 @@
 # Демонстрация лабораторной 1
 
+## Если сервис не стартует: `password authentication failed`
+
+Образ PostgreSQL применяет `POSTGRES_PASSWORD` только при первой инициализации пустого volume.
+Если volume создан раньше с другим паролем, новый пароль из `.env` игнорируется. Учебные данные не жалко:
+`docker compose --profile app down`, `docker volume rm dcaa_students-data`, снова `up`.
+
 ## За 10 минут до сдачи
 
 1. Запущен Docker Desktop.
@@ -49,7 +55,11 @@ docker compose stop app
 
 Register → Server:
 - General → Name: `dcaa`
-- Connection → Host: `localhost`, Port: значение `DB_PORT` (5432 или 55432), Database: `students`, Username: `students`, Password: `students`
+- Connection → Host: `127.0.0.1`, Port: значение `DB_PORT` (5432 или 55432), Maintenance database: `students`,
+  Username: `students`, Password: `students`. Поле Role оставить пустым.
+
+Порт БД опубликован только на IPv4 `127.0.0.1`, поэтому адрес лучше писать числом: `localhost` может
+сначала разрешиться в IPv6 `::1`. Не путать с PostgreSQL, установленной в систему: она обычно занимает 5432.
 
 Что показать в Schemas → public → Tables:
 - `students`: единственная предметная таблица.
