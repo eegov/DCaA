@@ -16,6 +16,9 @@
 
 - [ ] 3.1 `Dockerfile` (многоступенчатая сборка) и `compose.yaml` (db + app в сети `students`); ручная проверка: `docker compose --profile app up -d --build`, затем `GET /api/students` отвечает 200
 - [ ] 3.2 Локальный режим; ручная проверка: `docker compose up -d db`, `.\mvnw.cmd spring-boot:run`, `GET /api/students` отвечает 200
+- [x] 3.4 Режим без Docker: `docs/sql/create-local-db.sql`; проверено на Linux с PostgreSQL 17, установленной без контейнера: Liquibase создал схему, все операции API ответили по спецификации
+- [x] 3.5 Переносимость: `.gitattributes` (LF для `mvnw`, CRLF для `mvnw.cmd`), `mvnw` хранится в git как исполняемый; проверено `git ls-files -s` и `git ls-files --eol`
+- [ ] 3.6 Ручной запуск обоих режимов с Docker на Windows; macOS проверить при наличии машины
 - [ ] 3.3 README: требования к окружению, оба режима запуска, Swagger; команды из README выполняются как написано
 
 ## 4. Проверка
