@@ -9,7 +9,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import ru.dcaa.students.error.ConflictException;
 
-/** Студент. Правила смены состояния живут здесь, чтобы их нельзя было обойти из другого сервиса. */
 @Entity
 @Table(name = "students")
 public class Student {

@@ -23,7 +23,7 @@ class StudentService {
     }
 
     Student admit(AdmitStudentRequest request) {
-        return saveChecked(new Student(request.personalData(), request.course()), request.personalData());
+        return saveChecked(new Student(request.personalData(), request.course()));
     }
 
     @Transactional(readOnly = true)
@@ -39,7 +39,7 @@ class StudentService {
     Student update(long id, PersonalData data) {
         Student student = getForUpdate(id);
         student.updatePersonalData(data);
-        return saveChecked(student, data);
+        return saveChecked(student);
     }
 
     Student transfer(long id, TransferStudentRequest request) {
@@ -58,11 +58,6 @@ class StudentService {
         repository.delete(getForUpdate(id));
     }
 
-    /**
-     * Без блокировки параллельные правка и отчисление читают запись со статусом ACTIVE,
-     * и UPDATE правки затирает отчисление. С блокировкой второй запрос ждёт первый
-     * и проверяет правила уже на его результате.
-     */
     private Student getForUpdate(long id) {
         return repository.findForUpdateById(id).orElseThrow(() -> notFound(id));
     }
@@ -71,18 +66,14 @@ class StudentService {
         return new NotFoundException("Студент " + id + " не найден");
     }
 
-    /**
-     * Уникальность номера зачётки проверяет БД: отдельная проверка «есть ли такой» перед вставкой
-     * не защищает от двух одновременных запросов. flush выполняет SQL сразу, чтобы нарушение
-     * ограничения пришло сюда, а не при коммите транзакции за пределами сервиса.
-     */
-    private Student saveChecked(Student student, PersonalData data) {
+    /** flush выполняет SQL сразу, чтобы нарушение уникальности пришло сюда, а не при коммите за пределами сервиса. */
+    private Student saveChecked(Student student) {
         try {
             return repository.saveAndFlush(student);
         } catch (DataIntegrityViolationException exception) {
             if (exception.getCause() instanceof ConstraintViolationException violation
                     && RECORD_BOOK_CONSTRAINT.equals(violation.getConstraintName())) {
-                throw new ConflictException("Номер зачётки " + data.recordBookNumber() + " уже занят");
+                throw new ConflictException("Номер зачётки " + student.getRecordBookNumber() + " уже занят");
             }
             throw exception;
         }
