@@ -1,25 +1,48 @@
 #!/bin/sh
 # Git-хук pre-merge-commit: релизный шлюз для dev.
 # Ветку feature/* или fix/* нельзя влить в dev без отчёта ревью docs/reviews/<ветка>.md,
-# который пишет субагент-ревьюер в чистом контексте (скилл code-review).
+# который пишет субагент-ревьюер в чистом контексте (скилл code-review): последний раунд
+# без blocker и major, после него пройдено схлопывание.
 # Хук срабатывает только при создании merge-коммита. Fast-forward закрыт настройкой merge.ff=false
 # (docs/harness.md) и правилом guard.js для агента; git merge --ff-only человека этот хук не остановит.
 [ "$(git branch --show-current)" = "dev" ] || exit 0
 
+fail() {
+  echo "pre-merge-commit: $1"
+  echo "$2"
+  echo "Слияние не завершено, вернуть dev как было: git merge --abort"
+  exit 1
+}
+
 # git merge кладёт в GIT_REFLOG_ACTION строку "merge <ветка>"; MERGE_HEAD в этот момент ещё не записан.
-# Запрет по умолчанию: pull, merge по sha, refs/heads/... и удалённым веткам не проходят.
+# Запрет по умолчанию: pull, merge по sha, refs/heads/..., удалённые ветки и несколько веток сразу не проходят.
 case "$GIT_REFLOG_ACTION" in
+  "merge "*" "*) fail "в dev вливается одна ветка за раз." "Получено: $GIT_REFLOG_ACTION" ;;
   "merge chore/"*) exit 0 ;;
   "merge feature/"*|"merge fix/"*) merged=${GIT_REFLOG_ACTION#merge } ;;
-  *)
-    echo "pre-merge-commit: в dev вливается только локальная ветка: git merge --no-ff feature/<имя>"
-    echo "  получено: $GIT_REFLOG_ACTION"
-    exit 1 ;;
+  *) fail "в dev вливается только локальная ветка: git merge --no-ff feature/<имя>" "Получено: $GIT_REFLOG_ACTION" ;;
 esac
 
 report="docs/reviews/$(echo "$merged" | tr '/' '-').md"
-if ! git cat-file -e "$merged:$report" 2>/dev/null; then
-  echo "pre-merge-commit: в ветке $merged нет отчёта ревью $report."
-  echo "Запусти скилл code-review, закрой блокирующие замечания и закоммить отчёт в ветку."
-  exit 1
-fi
+git cat-file -e "$merged:$report" 2>/dev/null ||
+  fail "в ветке $merged нет отчёта ревью $report." "Запусти скилл code-review, закрой blocker и major и закоммить отчёт в ветку."
+
+# Разделы отчёта задаёт .claude/agents/reviewer.md: «# Ревью <ветка>, раунд N» со строкой «Итог:»
+# и «# Схлопывание <ветка>». Итог берём только из последнего раунда, схлопывание должно идти после него.
+state=$(git show "$merged:$report" | awk '
+  /^# Ревью /         { verdict = ""; collapsed = 0; inround = 1; next }
+  /^# Схлопывание /   { collapsed = 1; inround = 0; next }
+  inround && /^Итог:/ { verdict = $0 }
+  END { print collapsed "|" verdict }')
+collapsed=${state%%|*}
+verdict=${state#*|}
+
+case "$verdict" in
+  "Итог: блокирующих 0, важных 0,"*) ;;
+  *) fail "последний раунд ревью в $report не чистый: ${verdict:-нет строки «Итог:»}" \
+          "Закрой blocker и major, закоммить исправления и запусти следующий раунд code-review." ;;
+esac
+
+[ "$collapsed" = 1 ] ||
+  fail "в $report после последнего раунда нет прохода схлопывания." \
+       "Запусти code-review в режиме схлопывания (шаг 4 скилла) и закоммить отчёт."
