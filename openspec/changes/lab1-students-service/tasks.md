@@ -38,7 +38,7 @@
 ## 6. Проверка
 
 - [x] 6.1 `./mvnw verify` проходит на Windows 11 с Docker Desktop (Testcontainers, JDK 25)
-- [ ] 6.2 Ревью в чистом контексте (скилл `code-review`), раунд 2 без blocker и major, проход «схлопывания»
+- [x] 6.2 Ревью в чистом контексте (скилл `code-review`): раунд 3 без blocker и major, проход «схлопывания» проведён, отчёт `docs/reviews/feature-lab1-students.md`
 
 ## 7. Обвязка
 
