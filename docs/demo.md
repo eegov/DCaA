@@ -86,7 +86,7 @@ PostgreSQL читает все 2497 страниц таблицы (по 8 КБ) 
 ```
 /openspec-propose допка: индекс по group_name в students, показать разницу EXPLAIN ANALYZE до и после
 ```
-Агент по скиллу `liquibase-migration` создаёт новый файл (не правит `001`), например:
+Агент создаёт новый файл (править `001` не даст хук `guard.js`), например:
 ```sql
 --liquibase formatted sql
 

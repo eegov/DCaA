@@ -58,7 +58,7 @@ if (isChangeset) {
     existsInDev = false;
   }
   if (existsInDev) {
-    deny(`${relative} уже влит в dev и мог быть применён. Создай новый changeset (скилл liquibase-migration)`);
+    deny(`${relative} уже влит в dev и мог быть применён. Создай новый changeset по образцу 001 и подключи его в db.changelog-master.yaml`);
   }
 }
 process.exit(0);
