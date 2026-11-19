@@ -4,8 +4,8 @@
 Сейчас реализована **лабораторная 1**: основной сервис учёта студентов.
 
 - Требования преподавателя: [docs/labs-requirements.md](docs/labs-requirements.md)
-- Спецификация поведения: [openspec/](openspec/). Пока изменение не сдано, оно лежит в `openspec/changes/lab1-students-service/`,
-  после сдачи (архивации) его требования переносятся в `openspec/specs/`
+- Спецификация поведения: [openspec/specs/](openspec/specs/); изменение лабы 1 с решениями и задачами:
+  [openspec/changes/archive/2026-11-20-lab1-students-service/](openspec/changes/archive/2026-11-20-lab1-students-service/)
 - Как устроена агентская обвязка и как её подключить после клонирования: [docs/harness.md](docs/harness.md)
 - Сценарий демонстрации и pgAdmin: [docs/demo.md](docs/demo.md)
 
@@ -76,4 +76,4 @@ Swagger UI: http://localhost:8080/swagger-ui.html
 
 ## Почему такой стек
 
-Решения с причинами, включая выбор Java 25 и Spring Boot: `design.md` изменения `lab1-students-service` в `openspec/changes/`.
+Решения с причинами, включая выбор Java 25 и Spring Boot: [design.md](openspec/changes/archive/2026-11-20-lab1-students-service/design.md).
