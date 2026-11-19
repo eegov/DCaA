@@ -10,6 +10,7 @@
 ```powershell
 java -version                                  # нужен JDK 25; сборка проверит это сама
 git config core.hooksPath .githooks            # git-хуки проекта
+git config merge.ff false                      # merge всегда с merge-коммитом: при fast-forward pre-merge-commit не срабатывает
 npm i -g @fission-ai/openspec@1.16.0           # та же версия, что сгенерировала скиллы
 openspec config set delivery skills            # только скиллы, без дублирующих slash-команд
 ```
@@ -27,7 +28,7 @@ Git Bash (его требует сам Claude Code) и Node.js в `PATH`.
 | Субагент `reviewer` | `.claude/agents/reviewer.md` | Проверяет ветку в чистом контексте по 13 вопросам «да/нет», пишет отчёт и прогноз оценки | Просьба «оцени качество» даёт вежливую пустоту, работает список вопросов с ответом да или нет (гл. 22) |
 | Скилл `liquibase-migration` | `.claude/skills/liquibase-migration/` | Порядок изменения схемы и демонстрации эффекта миграции | Процедура нужна не всегда, поэтому скилл, а не правило (гл. 10, 12) |
 | Хук SessionStart | `.claude/hooks/session-start.sh` | В начале сессии показывает агенту ветку, правки, активные OpenSpec-изменения | Инструкция «прочитай состояние» срабатывает редко, хук всегда (гл. 13) |
-| Хук PreToolUse | `.claude/hooks/guard.js` | Блокирует `down -v`, удаление volumes, force push, `reset --hard`, чтение `.env`, правку уже влитых миграций | Необратимые действия закрываем кодом, а не текстом (гл. 13, 24). Агент получает причину отказа и что делать вместо этого |
+| Хук PreToolUse | `.claude/hooks/guard.js` | Блокирует `down -v`, удаление volumes, force push, `reset --hard`, `git merge` без `--no-ff`, чтение `.env`, правку уже влитых миграций | Необратимые действия закрываем кодом, а не текстом (гл. 13, 24). Агент получает причину отказа и что делать вместо этого |
 | Права | `.claude/settings.json` → `permissions` | Разрешает безопасные команды без подтверждения, запрещает чтение `.env` | Встроенный механизм дешевле своего кода |
 | Git-хуки | `.githooks/` | `pre-commit`: нет коммитов в master/dev и `.env`; `commit-msg`: Conventional Commits; `pre-merge-commit`: в dev не вливается feature/fix без отчёта ревью | Работают одинаково для человека и агента. Последний хук превращает ревью из пожелания в шлюз (гл. 3, п. 8) |
 

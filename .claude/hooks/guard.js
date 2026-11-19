@@ -26,6 +26,10 @@ const DANGEROUS_COMMANDS = [
     'reset --hard без возврата теряет незакоммиченную работу. Используй git stash'],
   [/\bgit\s+clean\s+-\w*f/,
     'git clean удаляет неотслеживаемые файлы без возврата'],
+  // При fast-forward merge-коммита нет, и шлюз pre-merge-commit (отчёт ревью) не срабатывает.
+  // merge.ff=false это закрывает, но --ff и --ff-only в команде сильнее настройки.
+  [/\bgit\s+merge(?![\w-])(?![^;&|\n]*\s--(no-ff|abort|continue|quit)\b)/,
+    'git merge без --no-ff может пройти fast-forward мимо хука pre-merge-commit. Добавь --no-ff'],
   [/(?<![\w.\/-])\.env(?![\w.-])/,
     'в .env лежат локальные пароли, агент их не читает. Пример значений в .env.example'],
 ];

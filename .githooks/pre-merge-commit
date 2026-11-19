@@ -2,7 +2,8 @@
 # Git-хук pre-merge-commit: релизный шлюз для dev.
 # Ветку feature/* или fix/* нельзя влить в dev без отчёта ревью docs/reviews/<ветка>.md,
 # который пишет субагент-ревьюер в чистом контексте (скилл code-review).
-# Хук срабатывает при git merge --no-ff (при fast-forward merge-коммита нет).
+# Хук срабатывает только при создании merge-коммита. Fast-forward закрыт настройкой merge.ff=false
+# (docs/harness.md) и правилом guard.js для агента; git merge --ff-only человека этот хук не остановит.
 [ "$(git branch --show-current)" = "dev" ] || exit 0
 
 # git merge кладёт в GIT_REFLOG_ACTION строку "merge <ветка>"; MERGE_HEAD в этот момент ещё не записан.
