@@ -4,7 +4,7 @@ context: |
   Учебный проект, вариант 2 «Учёт студентов». Требования преподавателя: docs/labs-requirements.md.
   Лабораторные 1–7 развивают одну систему. Делаем только текущую лабораторную,
   функции следующих (отчёты, шлюз, очередь, JWT) заранее не добавляем.
-  Стек: Java 21, Spring Boot, PostgreSQL, Liquibase (SQL changesets), springdoc-openapi, Docker Compose.
+  Стек: Java 25, Spring Boot, PostgreSQL, Liquibase (SQL changesets), springdoc-openapi, Docker Compose.
   Артефакты пишем на русском; заголовки OpenSpec и ключевые слова SHALL/WHEN/THEN на английском.
 
 rules:

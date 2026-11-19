@@ -32,7 +32,7 @@
 `.\mvnw.cmd` в PowerShell, `./mvnw` в bash/zsh.
 
 - Docker Desktop или Docker Engine с Compose v2: для режимов с контейнерами и для интеграционных тестов.
-- JDK 21: для запуска сервиса на хосте и тестов. Maven ставить не нужно.
+- JDK 25: для запуска сервиса на хосте и тестов. Maven ставить не нужно.
 - PostgreSQL 10+ (проверено на 18): только для режима без Docker.
 
 Настройки по умолчанию лежат в `.env.example`. Если нужно что-то поменять (например, порт 5432 занят),
@@ -75,5 +75,5 @@ Swagger UI: http://localhost:8080/swagger-ui.html
 
 ## Почему такой стек
 
-Java 21 и Spring Boot выбраны под всю серию: в лабах 3 и 6 нужны `RestTemplate` и `CompletableFuture`.
+Java 25 (текущий LTS) и Spring Boot выбраны под всю серию: в лабах 3 и 6 нужны `RestTemplate` и `CompletableFuture`.
 Остальные решения с причинами: `design.md` изменения `lab1-students-service` в `openspec/changes/archive/`.
