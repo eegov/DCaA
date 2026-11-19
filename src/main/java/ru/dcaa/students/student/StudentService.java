@@ -33,8 +33,7 @@ class StudentService {
 
     @Transactional(readOnly = true)
     Student get(long id) {
-        return repository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Студент " + id + " не найден"));
+        return repository.findById(id).orElseThrow(() -> notFound(id));
     }
 
     Student update(long id, PersonalData data) {
@@ -65,8 +64,11 @@ class StudentService {
      * и проверяет правила уже на его результате.
      */
     private Student getForUpdate(long id) {
-        return repository.findForUpdateById(id)
-                .orElseThrow(() -> new NotFoundException("Студент " + id + " не найден"));
+        return repository.findForUpdateById(id).orElseThrow(() -> notFound(id));
+    }
+
+    private static NotFoundException notFound(long id) {
+        return new NotFoundException("Студент " + id + " не найден");
     }
 
     /**
