@@ -7,10 +7,14 @@
 [ "$(git branch --show-current)" = "dev" ] || exit 0
 
 # git merge кладёт в GIT_REFLOG_ACTION строку "merge <ветка>"; MERGE_HEAD в этот момент ещё не записан.
-merged=${GIT_REFLOG_ACTION#merge }
-case "$merged" in
-  feature/*|fix/*) ;;
-  *) exit 0 ;;
+# Запрет по умолчанию: pull, merge по sha, refs/heads/... и удалённым веткам не проходят.
+case "$GIT_REFLOG_ACTION" in
+  "merge chore/"*) exit 0 ;;
+  "merge feature/"*|"merge fix/"*) merged=${GIT_REFLOG_ACTION#merge } ;;
+  *)
+    echo "pre-merge-commit: в dev вливается только локальная ветка: git merge --no-ff feature/<имя>"
+    echo "  получено: $GIT_REFLOG_ACTION"
+    exit 1 ;;
 esac
 
 report="docs/reviews/$(echo "$merged" | tr '/' '-').md"
