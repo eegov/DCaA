@@ -100,8 +100,28 @@ class StudentApiIT {
     }
 
     @Test
+    void getReturnsExpelledStudent() {
+        long id = admit("100");
+        expel(id);
+
+        MvcTestResult result = mvc.get().uri("/api/students/{id}", id).exchange();
+
+        assertThat(result).hasStatusOk();
+        assertThat(result).bodyJson().extractingPath("$.status").isEqualTo("EXPELLED");
+    }
+
+    @Test
     void getUnknownReturns404() {
         assertProblem(mvc.get().uri("/api/students/999").exchange(), HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void modifyingUnknownStudentReturns404() {
+        assertProblem(put("/api/students/999", updateJson("101")), HttpStatus.NOT_FOUND);
+        assertProblem(transfer(999, 3), HttpStatus.NOT_FOUND);
+        assertProblem(expel(999), HttpStatus.NOT_FOUND);
+        assertProblem(mvc.delete().uri("/api/students/999").exchange(), HttpStatus.NOT_FOUND);
+        assertThat(count()).isZero();
     }
 
     // --- Редактирование ---
@@ -119,6 +139,18 @@ class StudentApiIT {
                 .containsEntry("last_name", "Петров")
                 .containsEntry("group_name", "ПИбд-42")
                 .containsEntry("course", 4);
+    }
+
+    @Test
+    void updateWithInvalidFieldsReturns400AndKeepsRecord() {
+        long id = admit("100");
+        String json = updateJson("101").replace("\"Петров\"", "\" \"");
+
+        MvcTestResult result = put("/api/students/" + id, json);
+
+        assertProblem(result, HttpStatus.BAD_REQUEST);
+        assertThat(result).bodyJson().extractingPath("$.errors").asMap().containsOnlyKeys("lastName");
+        assertThat(row(id)).containsEntry("record_book_number", "100").containsEntry("last_name", "Иванов");
     }
 
     @Test
@@ -161,6 +193,17 @@ class StudentApiIT {
         assertThat(result).bodyJson().extractingPath("$.course").isEqualTo(3);
         assertThat(result).bodyJson().extractingPath("$.groupName").isEqualTo("ПИбд-31");
         assertThat(row(id)).containsEntry("course", 3).containsEntry("group_name", "ПИбд-31");
+    }
+
+    @Test
+    void transferWithInvalidFieldsReturns400AndKeepsRecord() {
+        long id = admit("100");
+
+        MvcTestResult result = transfer(id, 7);
+
+        assertProblem(result, HttpStatus.BAD_REQUEST);
+        assertThat(result).bodyJson().extractingPath("$.errors").asMap().containsOnlyKeys("course");
+        assertThat(row(id)).containsEntry("course", 4).containsEntry("group_name", "ПИбд-41");
     }
 
     @Test
@@ -216,6 +259,15 @@ class StudentApiIT {
 
         assertThat(mvc.delete().uri("/api/students/{id}", id).exchange()).hasStatus(HttpStatus.NO_CONTENT);
         assertProblem(mvc.get().uri("/api/students/{id}", id).exchange(), HttpStatus.NOT_FOUND);
+        assertThat(count()).isZero();
+    }
+
+    @Test
+    void deleteRemovesExpelledRecord() {
+        long id = admit("100");
+        expel(id);
+
+        assertThat(mvc.delete().uri("/api/students/{id}", id).exchange()).hasStatus(HttpStatus.NO_CONTENT);
         assertThat(count()).isZero();
     }
 
