@@ -1,4 +1,4 @@
-// Хук PreToolUse: Claude Code запускает его перед каждым вызовом Bash, Edit, Write, MultiEdit.
+// Хук PreToolUse: Claude Code запускает его перед каждым вызовом Bash, PowerShell, Edit, Write, MultiEdit.
 // На вход (stdin) приходит JSON вызова: { tool_name, tool_input: { command | file_path, ... } }.
 // Ответ кодом выхода: 0 разрешает вызов, 2 запрещает. Текст из stderr агент получает как причину отказа
 // и может исправить действие. Правила здесь про необратимые действия: их нельзя доверять тексту в CLAUDE.md.
@@ -34,7 +34,8 @@ const DANGEROUS_COMMANDS = [
     'в .env лежат локальные пароли, агент их не читает. Пример значений в .env.example'],
 ];
 
-if (call.tool_name === 'Bash') {
+// На Windows у Claude Code есть отдельный инструмент PowerShell, команды в нём те же.
+if (call.tool_name === 'Bash' || call.tool_name === 'PowerShell') {
   const command = call.tool_input.command || '';
   for (const [pattern, reason] of DANGEROUS_COMMANDS) {
     if (pattern.test(command)) deny(reason);
