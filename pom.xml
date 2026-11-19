@@ -78,6 +78,27 @@
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
       </plugin>
+      <!-- Понятная ошибка вместо "release version 25 not supported", если Maven запущен на старом JDK -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>require-java</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <requireJavaVersion>
+                  <version>[${java.version},)</version>
+                  <message>Нужен JDK ${java.version} или новее. Maven запущен на другом JDK: проверь JAVA_HOME (java -version, echo $env:JAVA_HOME).</message>
+                </requireJavaVersion>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
       <!-- Классы *IT запускаются на фазе verify: им нужен Docker для Testcontainers -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
