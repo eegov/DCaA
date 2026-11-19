@@ -17,7 +17,7 @@
 - [x] 3.1 `Dockerfile` (многоступенчатая сборка) и `compose.yaml` (db + app в сети `students`); проверено на Windows 11: `docker compose --profile app up -d --build`, Swagger открывается
 - [x] 3.2 Локальный режим; проверено на Windows 11: `docker compose up -d db`, `.\mvnw.cmd spring-boot:run`, `GET /api/students` отвечает 200; запись, созданная через сервис, найдена `psql` в контейнере `db`, то есть сервис подключился к контейнерной БД, а не к PostgreSQL на хосте
 - [x] 3.3 README: требования к окружению, режимы запуска, Swagger; проверено на Windows 11 командами из README: все три режима отвечают на `GET /api/students` 200, Swagger открывается; в режиме без Docker пользователь и БД в службе PostgreSQL 18 уже были созданы, порт 5432 задан через `DB_PORT`
-- [x] 3.4 Режим без Docker: `docs/sql/create-local-db.sql`; проверено на Linux с PostgreSQL 18.6 без контейнера: скрипт создал пользователя и БД, Liquibase создал схему, 28 тестов прошли на этой БД
+- [x] 3.4 Режим без Docker: `docs/sql/create-local-db.sql`; проверено на Linux с PostgreSQL 18.6 без контейнера: скрипт создал пользователя и БД, Liquibase создал схему, тесты прошли на этой БД
 - [x] 3.5 Переносимость: `.gitattributes` (LF для `mvnw`, CRLF для `mvnw.cmd`), `mvnw` хранится исполняемым; проверено `git ls-files -s` и `git ls-files --eol`
 - [ ] 3.6 macOS: оба режима, при наличии машины
 
@@ -31,18 +31,18 @@
 
 ## 5. Стек и окружение
 
-- [x] 5.1 PostgreSQL 18 (образ, Testcontainers, путь volume `/var/lib/postgresql`); 28 тестов прошли на 18.6
-- [x] 5.2 Java 25 LTS (`pom.xml`, образы `eclipse-temurin:25`); 28 тестов прошли на Temurin 25 (Linux) и на Windows 11
+- [x] 5.1 PostgreSQL 18 (образ, Testcontainers, путь volume `/var/lib/postgresql`); тесты прошли на 18.6
+- [x] 5.2 Java 25 LTS (`pom.xml`, образы `eclipse-temurin:25`); тесты прошли на Temurin 25 (Linux) и на Windows 11
 - [x] 5.3 Проверка версии JDK в сборке (`maven-enforcer-plugin`): на JDK 21 сборка останавливается с понятным сообщением
 
 ## 6. Проверка
 
-- [x] 6.1 `./mvnw verify` проходит на Windows 11 с Docker Desktop (Testcontainers, JDK 25): 36 тестов
+- [x] 6.1 `./mvnw verify` проходит на Windows 11 с Docker Desktop (Testcontainers, JDK 25)
 - [ ] 6.2 Ревью в чистом контексте (скилл `code-review`), раунд 2 без blocker и major, проход «схлопывания»
 
 ## 7. Обвязка
 
-- [x] 7.1 Обвязка агента по итогам аудита, поведение сервиса не меняется (коммиты `chore(harness)` после `0ef9326`): `merge.ff=false` и проверка в `pre-merge-commit` закрывают обход шлюза ревью через fast-forward, в dev вливаются только локальные `feature/*`, `fix/*` с отчётом ревью и `chore/*`; `guard.js` действует и в Bash, и в PowerShell; ревьюер работает на Opus, сам запускает `./mvnw verify`, дописывает отчёт, а не переписывает его; скилл liquibase-migration удалён (см. `docs/harness.md`)
+- [x] 7.1 Обвязка агента по итогам аудита (коммиты `chore(harness)` после `0ef9326`), поведение сервиса не меняется; описание в `docs/harness.md`
 
 ## 8. Исправления по ревью, раунд 2
 
