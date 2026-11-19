@@ -1,7 +1,8 @@
 #!/bin/sh
 # Git-хук pre-merge-commit: релизный шлюз для dev.
 # Ветку feature/* или fix/* нельзя влить в dev без отчёта ревью docs/reviews/<ветка>.md,
-# который пишет субагент-ревьюер в чистом контексте (скилл code-review).
+# который пишет субагент-ревьюер в чистом контексте (скилл code-review): последний раунд
+# без blocker и major, после него пройдено схлопывание.
 # Хук срабатывает только при создании merge-коммита. Fast-forward закрыт настройкой merge.ff=false
 # (docs/harness.md) и правилом guard.js для агента; git merge --ff-only человека этот хук не остановит.
 [ "$(git branch --show-current)" = "dev" ] || exit 0
@@ -23,3 +24,21 @@ if ! git cat-file -e "$merged:$report" 2>/dev/null; then
   echo "Запусти скилл code-review, закрой блокирующие замечания и закоммить отчёт в ветку."
   exit 1
 fi
+
+# Отчёт есть, но ревью могло закончиться с ошибками. Строки «Итог:» и заголовки задаёт .claude/agents/reviewer.md.
+verdict=$(git show "$merged:$report" | grep '^Итог:' | tail -n 1)
+case "$verdict" in
+  "Итог: блокирующих 0, важных 0,"*) ;;
+  *)
+    echo "pre-merge-commit: последний раунд ревью в $report не чистый: ${verdict:-нет строки «Итог:»}"
+    echo "Закрой blocker и major, закоммить исправления и запусти следующий раунд code-review."
+    exit 1 ;;
+esac
+
+case "$(git show "$merged:$report" | grep '^# ' | tail -n 1)" in
+  "# Схлопывание "*) ;;
+  *)
+    echo "pre-merge-commit: в $report после последнего раунда нет прохода схлопывания."
+    echo "Запусти code-review в режиме схлопывания (шаг 4 скилла) и закоммить отчёт."
+    exit 1 ;;
+esac
