@@ -276,6 +276,7 @@ class StudentApiIT {
     @Test
     void malformedJsonReturns400() {
         assertProblem(post("/api/students", "это не JSON"), HttpStatus.BAD_REQUEST);
+        assertThat(count()).isZero();
     }
 
     @Test
@@ -305,6 +306,15 @@ class StudentApiIT {
         long id = admit("100");
 
         assertProblem(post("/api/students/" + id + "/transfer", "{\"course\": 2.9, \"groupName\": \"ПИбд-21\"}"),
+                HttpStatus.BAD_REQUEST);
+        assertThat(row(id)).containsEntry("course", 4).containsEntry("group_name", "ПИбд-41");
+    }
+
+    @Test
+    void stringCourseOnTransferReturns400() {
+        long id = admit("100");
+
+        assertProblem(post("/api/students/" + id + "/transfer", "{\"course\": \"3\", \"groupName\": \"ПИбд-31\"}"),
                 HttpStatus.BAD_REQUEST);
         assertThat(row(id)).containsEntry("course", 4).containsEntry("group_name", "ПИбд-41");
     }
