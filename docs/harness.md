@@ -50,7 +50,8 @@ Git Bash (его требует сам Claude Code) и Node.js в `PATH`.
                            └─ code-review    субагент в чистом контексте, раунды до 0 blocker/major, схлопывание
                                 └─ /openspec-archive-change   спека переезжает в openspec/specs/
                                      └─ git merge --no-ff в dev   (хук проверит отчёт ревью)
-сдача лабы: dev → master, тег labN
+сдача лабы: тег labN на dev, преподавателю ссылка на тег
+приёмка:     git merge --no-ff labN в master (в master только принятое)
 ```
 
 ## Почему ревьюер похож на проверяющего
