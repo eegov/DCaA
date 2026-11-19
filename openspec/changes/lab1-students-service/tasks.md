@@ -40,6 +40,10 @@
 - [x] 6.1 `./mvnw verify` проходит на Windows 11 с Docker Desktop (Testcontainers, JDK 25): 28 тестов
 - [ ] 6.2 Ревью в чистом контексте (скилл `code-review`), раунд 2 без blocker и major, проход «схлопывания»
 
+## 7. Обвязка
+
+- [x] 7.1 Обвязка агента по итогам аудита, поведение сервиса не меняется (коммиты `chore(harness)` после `0ef9326`): `merge.ff=false` и проверка в `pre-merge-commit` закрывают обход шлюза ревью через fast-forward, в dev вливаются только локальные `feature/*`, `fix/*` с отчётом ревью и `chore/*`; `guard.js` действует и в Bash, и в PowerShell; ревьюер работает на Opus, сам запускает `./mvnw verify`, дописывает отчёт, а не переписывает его; скилл liquibase-migration удалён (см. `docs/harness.md`)
+
 ## Workflow follow-up
 
 - Архивировать изменение (`/openspec-archive-change`) после ревью.
