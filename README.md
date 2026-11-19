@@ -76,5 +76,4 @@ Swagger UI: http://localhost:8080/swagger-ui.html
 
 ## Почему такой стек
 
-Java 25 (текущий LTS) и Spring Boot выбраны под всю серию: в лабах 3 и 6 нужны `RestTemplate` и `CompletableFuture`.
-Остальные решения с причинами: `design.md` изменения `lab1-students-service` в `openspec/changes/`.
+Решения с причинами, включая выбор Java 25 и Spring Boot: `design.md` изменения `lab1-students-service` в `openspec/changes/`.
