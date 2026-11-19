@@ -7,7 +7,7 @@ import org.springframework.data.jpa.repository.Lock;
 
 interface StudentRepository extends JpaRepository<Student, Long> {
 
-    /** SELECT ... FOR UPDATE: параллельные изменения одной записи выполняются по очереди. */
+    /** Блокировка строки (в PostgreSQL FOR NO KEY UPDATE): параллельные изменения одной записи выполняются по очереди. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<Student> findForUpdateById(long id);
 }
