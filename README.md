@@ -4,8 +4,9 @@
 Сейчас реализована **лабораторная 1**: основной сервис учёта студентов.
 
 - Требования преподавателя: [docs/labs-requirements.md](docs/labs-requirements.md)
-- Спецификация поведения: [openspec/specs/](openspec/specs/)
-- Как устроена агентская обвязка: [docs/harness.md](docs/harness.md)
+- Спецификация поведения: [openspec/](openspec/). Пока изменение не сдано, оно лежит в `openspec/changes/lab1-students-service/`,
+  после сдачи (архивации) его требования переносятся в `openspec/specs/`
+- Как устроена агентская обвязка и как её подключить после клонирования: [docs/harness.md](docs/harness.md)
 - Сценарий демонстрации и pgAdmin: [docs/demo.md](docs/demo.md)
 
 ## Что умеет сервис
@@ -76,4 +77,4 @@ Swagger UI: http://localhost:8080/swagger-ui.html
 ## Почему такой стек
 
 Java 25 (текущий LTS) и Spring Boot выбраны под всю серию: в лабах 3 и 6 нужны `RestTemplate` и `CompletableFuture`.
-Остальные решения с причинами: `design.md` изменения `lab1-students-service` в `openspec/changes/archive/`.
+Остальные решения с причинами: `design.md` изменения `lab1-students-service` в `openspec/changes/`.
