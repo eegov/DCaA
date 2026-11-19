@@ -235,6 +235,29 @@ class StudentApiIT {
     }
 
     @Test
+    void fractionalCourseOnAdmitReturns400() {
+        assertProblem(post("/api/students", admitJson("100").replace("\"course\": 4", "\"course\": 2.9")),
+                HttpStatus.BAD_REQUEST);
+        assertThat(count()).isZero();
+    }
+
+    @Test
+    void stringCourseOnAdmitReturns400() {
+        assertProblem(post("/api/students", admitJson("100").replace("\"course\": 4", "\"course\": \"3\"")),
+                HttpStatus.BAD_REQUEST);
+        assertThat(count()).isZero();
+    }
+
+    @Test
+    void fractionalCourseOnTransferReturns400() {
+        long id = admit("100");
+
+        assertProblem(post("/api/students/" + id + "/transfer", "{\"course\": 2.9, \"groupName\": \"ПИбд-21\"}"),
+                HttpStatus.BAD_REQUEST);
+        assertThat(row(id)).containsEntry("course", 4).containsEntry("group_name", "ПИбд-41");
+    }
+
+    @Test
     void unsupportedMethodReturns405() {
         long id = admit("100");
 
