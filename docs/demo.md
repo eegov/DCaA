@@ -9,7 +9,7 @@
 ## За 10 минут до сдачи
 
 1. Запущен Docker Desktop.
-2. `git switch master` (на master лежит сданная версия).
+2. `git switch --detach lab1`: тег указывает на сданную версию, master обновляется только после приёмки.
 3. Если порт 5432 занят, в `.env` стоит `DB_PORT=55432` (скопировать из `.env.example`).
 4. `docker compose --profile app up -d --build`, затем `docker compose ps`: `db` в состоянии `healthy`, `app` в состоянии `Up`.
 5. Открыт http://localhost:8080/swagger-ui.html.
