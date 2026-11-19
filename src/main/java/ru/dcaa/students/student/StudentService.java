@@ -38,25 +38,35 @@ class StudentService {
     }
 
     Student update(long id, PersonalData data) {
-        Student student = get(id);
+        Student student = getForUpdate(id);
         student.updatePersonalData(data);
         return saveChecked(student, data);
     }
 
     Student transfer(long id, TransferStudentRequest request) {
-        Student student = get(id);
+        Student student = getForUpdate(id);
         student.transfer(request.course(), request.groupName());
         return student;
     }
 
     Student expel(long id) {
-        Student student = get(id);
+        Student student = getForUpdate(id);
         student.expel();
         return student;
     }
 
     void delete(long id) {
-        repository.delete(get(id));
+        repository.delete(getForUpdate(id));
+    }
+
+    /**
+     * Без блокировки параллельные правка и отчисление читают запись со статусом ACTIVE,
+     * и UPDATE правки затирает отчисление. С блокировкой второй запрос ждёт первый
+     * и проверяет правила уже на его результате.
+     */
+    private Student getForUpdate(long id) {
+        return repository.findForUpdateById(id)
+                .orElseThrow(() -> new NotFoundException("Студент " + id + " не найден"));
     }
 
     /**
