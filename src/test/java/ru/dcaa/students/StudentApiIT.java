@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -17,7 +19,7 @@ import org.springframework.test.web.servlet.assertj.MvcTestResult;
 
 /**
  * Сценарии спецификаций student-records и service-runtime (документация API).
- * Каждый тест проверяет статус, тело ответа и состояние БД: изменилась запись или осталась прежней.
+ * Тесты проверяют статус и тело ответа, а тесты изменяющих операций ещё и состояние БД.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -92,7 +94,7 @@ class StudentApiIT {
     void getReturnsStudent() {
         long id = admit("100");
 
-        MvcTestResult result = mvc.get().uri("/api/students/{id}", id).exchange();
+        MvcTestResult result = get(id);
 
         assertThat(result).hasStatusOk();
         assertThat(result).bodyJson().extractingPath("$.recordBookNumber").isEqualTo("100");
@@ -104,7 +106,7 @@ class StudentApiIT {
         long id = admit("100");
         expel(id);
 
-        MvcTestResult result = mvc.get().uri("/api/students/{id}", id).exchange();
+        MvcTestResult result = get(id);
 
         assertThat(result).hasStatusOk();
         assertThat(result).bodyJson().extractingPath("$.status").isEqualTo("EXPELLED");
@@ -112,7 +114,7 @@ class StudentApiIT {
 
     @Test
     void getUnknownReturns404() {
-        assertProblem(mvc.get().uri("/api/students/999").exchange(), HttpStatus.NOT_FOUND);
+        assertProblem(get(999), HttpStatus.NOT_FOUND);
     }
 
     @Test
@@ -120,7 +122,7 @@ class StudentApiIT {
         assertProblem(put("/api/students/999", updateJson("101")), HttpStatus.NOT_FOUND);
         assertProblem(transfer(999, 3), HttpStatus.NOT_FOUND);
         assertProblem(expel(999), HttpStatus.NOT_FOUND);
-        assertProblem(mvc.delete().uri("/api/students/999").exchange(), HttpStatus.NOT_FOUND);
+        assertProblem(delete(999), HttpStatus.NOT_FOUND);
         assertThat(count()).isZero();
     }
 
@@ -153,14 +155,14 @@ class StudentApiIT {
         assertThat(row(id)).containsEntry("record_book_number", "100").containsEntry("last_name", "Иванов");
     }
 
-    @Test
-    void updateWithCourseFieldReturns400AndKeepsRecord() {
-        assertUpdateWithExtraFieldIsRejected("\"course\": 1");
-    }
+    @ParameterizedTest
+    @ValueSource(strings = {"\"course\": 1", "\"status\": \"ACTIVE\""})
+    void updateWithCourseOrStatusReturns400AndKeepsRecord(String extraField) {
+        long id = admit("100");
+        String json = updateJson("101").replace("}", ", " + extraField + "}");
 
-    @Test
-    void updateWithStatusFieldReturns400AndKeepsRecord() {
-        assertUpdateWithExtraFieldIsRejected("\"status\": \"ACTIVE\"");
+        assertProblem(put("/api/students/" + id, json), HttpStatus.BAD_REQUEST);
+        assertThat(row(id)).containsEntry("record_book_number", "100").containsEntry("course", 4);
     }
 
     @Test
@@ -257,8 +259,8 @@ class StudentApiIT {
     void deleteRemovesRecord() {
         long id = admit("100");
 
-        assertThat(mvc.delete().uri("/api/students/{id}", id).exchange()).hasStatus(HttpStatus.NO_CONTENT);
-        assertProblem(mvc.get().uri("/api/students/{id}", id).exchange(), HttpStatus.NOT_FOUND);
+        assertThat(delete(id)).hasStatus(HttpStatus.NO_CONTENT);
+        assertProblem(get(id), HttpStatus.NOT_FOUND);
         assertThat(count()).isZero();
     }
 
@@ -267,7 +269,7 @@ class StudentApiIT {
         long id = admit("100");
         expel(id);
 
-        assertThat(mvc.delete().uri("/api/students/{id}", id).exchange()).hasStatus(HttpStatus.NO_CONTENT);
+        assertThat(delete(id)).hasStatus(HttpStatus.NO_CONTENT);
         assertThat(count()).isZero();
     }
 
@@ -287,34 +289,20 @@ class StudentApiIT {
         assertThat(count()).isZero();
     }
 
-    @Test
-    void fractionalCourseOnAdmitReturns400() {
-        assertProblem(post("/api/students", admitJson("100").replace("\"course\": 4", "\"course\": 2.9")),
+    @ParameterizedTest
+    @ValueSource(strings = {"2.9", "\"3\""})
+    void nonIntegerCourseOnAdmitReturns400(String course) {
+        assertProblem(post("/api/students", admitJson("100").replace("\"course\": 4", "\"course\": " + course)),
                 HttpStatus.BAD_REQUEST);
         assertThat(count()).isZero();
     }
 
-    @Test
-    void stringCourseOnAdmitReturns400() {
-        assertProblem(post("/api/students", admitJson("100").replace("\"course\": 4", "\"course\": \"3\"")),
-                HttpStatus.BAD_REQUEST);
-        assertThat(count()).isZero();
-    }
-
-    @Test
-    void fractionalCourseOnTransferReturns400() {
+    @ParameterizedTest
+    @ValueSource(strings = {"2.9", "\"3\""})
+    void nonIntegerCourseOnTransferReturns400(String course) {
         long id = admit("100");
 
-        assertProblem(post("/api/students/" + id + "/transfer", "{\"course\": 2.9, \"groupName\": \"ПИбд-21\"}"),
-                HttpStatus.BAD_REQUEST);
-        assertThat(row(id)).containsEntry("course", 4).containsEntry("group_name", "ПИбд-41");
-    }
-
-    @Test
-    void stringCourseOnTransferReturns400() {
-        long id = admit("100");
-
-        assertProblem(post("/api/students/" + id + "/transfer", "{\"course\": \"3\", \"groupName\": \"ПИбд-31\"}"),
+        assertProblem(post("/api/students/" + id + "/transfer", "{\"course\": " + course + ", \"groupName\": \"ПИбд-31\"}"),
                 HttpStatus.BAD_REQUEST);
         assertThat(row(id)).containsEntry("course", 4).containsEntry("group_name", "ПИбд-41");
     }
@@ -350,18 +338,18 @@ class StudentApiIT {
         assertThat(result).bodyJson().extractingPath("$.detail").isNotNull();
     }
 
-    private void assertUpdateWithExtraFieldIsRejected(String extraField) {
-        long id = admit("100");
-        String json = updateJson("101").replace("}", ", " + extraField + "}");
-
-        assertProblem(put("/api/students/" + id, json), HttpStatus.BAD_REQUEST);
-        assertThat(row(id)).containsEntry("record_book_number", "100").containsEntry("course", 4);
-    }
-
     private long admit(String recordBookNumber) {
         assertThat(post("/api/students", admitJson(recordBookNumber))).hasStatus(HttpStatus.CREATED);
         return jdbc.queryForObject("select id from students where record_book_number = ?", Long.class,
                 recordBookNumber);
+    }
+
+    private MvcTestResult get(long id) {
+        return mvc.get().uri("/api/students/{id}", id).exchange();
+    }
+
+    private MvcTestResult delete(long id) {
+        return mvc.delete().uri("/api/students/{id}", id).exchange();
     }
 
     private MvcTestResult expel(long id) {
