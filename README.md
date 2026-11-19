@@ -54,7 +54,7 @@ docker compose up -d db
 
 **Без Docker** (PostgreSQL установлена на компьютер):
 ```powershell
-psql -U postgres -f docs\sql\create-local-db.sql   # один раз: пользователь и БД students
+& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres -f docs\sql\create-local-db.sql   # один раз
 .\mvnw.cmd spring-boot:run
 ```
 Команды для Linux и macOS указаны в начале `docs/sql/create-local-db.sql`. Если PostgreSQL слушает не 5432,
