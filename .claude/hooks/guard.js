@@ -85,28 +85,54 @@ function withoutGitMessages(command) {
 
 const HARMLESS_REDIRECT = /\d?>>?\s*(?:&\d|\/dev\/null|\$null|nul\b)/gi;
 
-// Влитые миграции через оболочку: команда, которая упоминает каталог changelog или имя уже влитого
-// changeset, проходит, только если каждая её часть (между ; && || |) начинается с команды, которая
-// не меняет файлы, и в команде нет перенаправления в файл. Запрет по умолчанию: способов записать
-// файл (sed -i, tee, Set-Content, Out-File, mv, cp, [IO.File]::WriteAllText, python -c...) больше,
-// чем способов его прочитать. Цена: sed -n, awk и bash -c с таким путём тоже не пройдут.
+// Влитые миграции через оболочку. Часть команды (между ; && || & и переводом строки) «касается» их,
+// если упоминает имя влитого changeset, каталог changelog целиком или глоб в нём, а после cd в changelog
+// ещё и глоб. Такая часть и все следующие за ней звенья конвейера | (в PowerShell по конвейеру идут
+// сами файлы: Get-ChildItem | Remove-Item) должны начинаться с команды, которая не меняет файлы,
+// и не содержать перенаправления, подстановки $( ) или --output. Запрет по умолчанию: способов записать
+// файл (sed -i, tee, Set-Content, Out-File, mv, cp, python -c...) больше, чем способов его прочитать.
+// Цена: sed -n, awk и bash -c с таким путём тоже не пройдут. Новый changeset ветки (его нет в dev) не касается.
 const KEEPS_FILES = new Set(['cat', 'type', 'get-content', 'gc', 'head', 'tail', 'less', 'more', 'grep', 'egrep',
   'fgrep', 'rg', 'findstr', 'select-string', 'sls', 'wc', 'diff', 'ls', 'dir', 'get-childitem', 'gci',
-  'cd', 'set-location', 'sl', 'pushd', 'popd', 'echo', 'write-output']);
+  'get-item', 'test-path', 'find', 'sort', 'sort-object', 'uniq', 'cut', 'nl', 'select-object', 'where-object',
+  'measure-object', 'format-table', 'format-list', 'out-string', 'cd', 'set-location', 'sl', 'pushd', 'popd',
+  'echo', 'write-output']);
 const GIT_KEEPS_FILES = new Set(['diff', 'log', 'show', 'blame', 'status', 'grep', 'ls-files', 'ls-tree',
   'cat-file', 'add', 'commit']);
+const CHANGELOG_WHOLE = /db[\\/]+changelog(?:[\\/]+(?:[^\s'"]*[*?[][^\s'"]*)?)?(?=$|[\s'")])/i;
+const CHANGELOG_ANY = /db[\\/]+changelog/i;
+const GLOB = /(?:^|\s)(?!-)\S*[*?[]/;
 
-function keepsFiles(command) {
-  if (command.includes('>')) return false;
-  return command.split(/&&|\|\||[;|&\n]/).every((part) => {
-    const words = part.trim().replace(/^[({!\s]+/, '').replace(/^(?:\w+=\S*\s+)+/, '').split(/\s+/);
-    const program = words[0].toLowerCase().replace(/\.exe$/, '');
-    if (program === '') return true;
-    if (program !== 'git') return KEEPS_FILES.has(program);
-    let i = 1;
-    while (/^-[cC]$/.test(words[i])) i += 2;
-    return GIT_KEEPS_FILES.has(words[i]);
-  });
+function words(part) {
+  return part.trim().replace(/^[({!\s]+/, '').replace(/^(?:\w+=\S*\s+)+/, '').split(/\s+/);
+}
+
+function keepsFiles(part) {
+  if (/>|\$\(|\x60|--output\b/.test(part)) return false;
+  const w = words(part);
+  const program = w[0].toLowerCase().replace(/\.exe$/, '');
+  if (program === '') return true;
+  if (program === 'find') return !/\s-(?:delete|exec\w*|ok\w*|fprint\w*|fls)\b/.test(part);
+  if (program !== 'git') return KEEPS_FILES.has(program);
+  let i = 1;
+  while (/^-[cC]$/.test(w[i])) i += 2;
+  // Возврат файла к закоммиченному виду ничего не ломает, взять его из другой ветки нельзя.
+  if (w[i] === 'restore') return !/\s(?:-s|--source)\b/.test(part);
+  if (w[i] === 'checkout') return w[i + 1] === '--' || (w[i + 1] === 'HEAD' && w[i + 2] === '--');
+  return GIT_KEEPS_FILES.has(w[i]);
+}
+
+function changesNamedChangesets(command, mergedNames) {
+  let inChangelog = false;
+  for (const chain of command.split(/&&|\|\||[;&\n]/)) {
+    const parts = chain.split('|');
+    const first = parts.findIndex((part) => mergedNames.some((n) => part.includes(n))
+      || CHANGELOG_WHOLE.test(part) || (inChangelog && GLOB.test(part)));
+    if (first !== -1 && !parts.slice(first).every(keepsFiles)) return true;
+    const w = words(parts[0]);
+    if (/^(?:cd|set-location|sl|pushd)$/i.test(w[0]) && CHANGELOG_ANY.test(parts[0])) inChangelog = true;
+  }
+  return false;
 }
 
 // На Windows у Claude Code есть отдельный инструмент PowerShell, команды в нём те же.
@@ -119,14 +145,16 @@ if (call.tool_name === 'Bash' || call.tool_name === 'PowerShell') {
   if (ENV_FILE.test(command)) {
     deny('в .env лежат локальные пароли, агент их не читает. Пример значений в .env.example');
   }
-  // Имя файла без каталога ловит cd в changelog и запись по короткому имени; git вызывается,
-  // только если в команде есть похожее расширение.
-  const touchesChangelog = /db[\\/]+changelog/i.test(command) || (/\.(?:sql|ya?ml|xml|json)\b/i.test(command)
-    && changesetsInDev().some((f) => command.includes(path.posix.basename(f))));
-  if (touchesChangelog && !keepsFiles(command)) {
-    deny('команда может изменить влитый changeset Liquibase, а его checksum уже записан в БД. '
-      + 'Читать можно: cat, Get-Content, grep, git diff/log/show. Новый changeset создай инструментом Write '
-      + 'по образцу 001 и подключи его в db.changelog-master.yaml инструментом Edit');
+  // Имя без каталога ловит запись по короткому имени после cd. git вызывается, только если команда
+  // похожа на работу с changelog.
+  if (CHANGELOG_ANY.test(command) || /\.(?:sql|ya?ml|xml|json)\b/i.test(command)) {
+    const mergedNames = changesetsInDev().map((f) => path.posix.basename(f));
+    if (changesNamedChangesets(command, mergedNames)) {
+      deny('команда меняет файлы и упоминает влитый changeset, каталог changelog целиком или глоб в нём. '
+        + 'Checksum влитого changeset уже записан в БД, после правки приложение не стартует. '
+        + 'Читать можно: cat, Get-Content, grep, ls, find, git diff/log/show; вернуть файл к закоммиченному: git restore. '
+        + 'Новый changeset создай инструментом Write по образцу 001 и подключи его в db.changelog-master.yaml инструментом Edit');
+    }
   }
   process.exit(0);
 }
