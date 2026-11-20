@@ -3,7 +3,7 @@
 # Ветку feature/* или fix/* нельзя влить в dev без отчёта ревью docs/reviews/<ветка>.md,
 # который пишет субагент-ревьюер в чистом контексте (скилл code-review): последний раунд
 # без blocker и major, после него пройдено схлопывание, после коммита с отчётом код не менялся.
-# Ветка chore/* проходит без отчёта, если не трогает src/ и pom.xml.
+# Ветка chore/* проходит без отчёта, если не трогает src/, pom.xml, Dockerfile и compose.yaml.
 # Хук срабатывает только при создании merge-коммита. Fast-forward закрыт настройкой merge.ff=false
 # (docs/harness.md) и правилом guard.js для агента; git merge --ff-only человека этот хук не остановит.
 [ "$(git branch --show-current)" = "dev" ] || exit 0
@@ -23,14 +23,15 @@ case "$GIT_REFLOG_ACTION" in
   *) fail "в dev вливается только локальная ветка: git merge --no-ff feature/<имя>" "Получено: $GIT_REFLOG_ACTION" ;;
 esac
 
-# chore/* не меняет поведение (CLAUDE.md, «Инварианты»), поэтому идёт без OpenSpec и отчёта ревью.
-# Код, сборка и миграции (src/, pom.xml) через chore не проходят. HEAD здесь ещё dev.
+# chore/* идёт без отчёта ревью, поэтому через него не проходят код, миграции, сборка и запуск
+# (src/, pom.xml, Dockerfile, compose.yaml: последние два реализуют сценарии service-runtime).
+# CLAUDE.md, «Инварианты». HEAD здесь ещё dev.
 case "$merged" in
   chore/*)
-    code=$(git -c core.quotepath=off diff --no-renames --name-only "HEAD...$merged" -- src pom.xml)
+    code=$(git -c core.quotepath=off diff --no-renames --name-only "HEAD...$merged" -- src pom.xml Dockerfile compose.yaml)
     [ -z "$code" ] ||
-      fail "ветка $merged меняет код, сборку или миграции: $(echo $code)" \
-           "Такие правки меняют поведение: перенеси их в feature/<имя> или fix/<имя> от dev, проведи через OpenSpec (propose, apply) и скилл code-review."
+      fail "ветка $merged меняет код, сборку или запуск: $(echo $code)" \
+           "Перенеси эти правки в feature/<имя> или fix/<имя> от dev и пройди скилл code-review; если меняется поведение, сначала OpenSpec (propose, apply)."
     exit 0 ;;
 esac
 
