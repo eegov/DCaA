@@ -19,6 +19,7 @@ function deny(reason) {
 const START = String.raw`(?:^|[;&|({\n]\s*)(?:\w+=\S*\s+)*`;
 const GIT = START + String.raw`git(?:\.exe)?(?:\s+-[cC]\s+\S+)*\s+`;
 const ARGS = String.raw`[^;&|\n]*`;
+const HOOK_SETTINGS = String.raw`(?:core\.hookspath|merge\.ff)`;
 
 // Опасные команды: [шаблон, причина и что делать вместо этого].
 const DANGEROUS_COMMANDS = [
@@ -36,6 +37,16 @@ const DANGEROUS_COMMANDS = [
   // merge.ff=false это закрывает, но --ff, --ff-only и -c merge.ff=true в команде сильнее настройки.
   [new RegExp(GIT + String.raw`merge(?![\w-])(?!${ARGS}\s--(?:no-ff|abort|continue|quit)\b)`),
     'git merge без --no-ff может пройти fast-forward мимо хука pre-merge-commit. Добавь --no-ff'],
+  // Git-хуки (.githooks/) проверяют ветку, формат коммита и отчёт ревью. Их отключение снимает все проверки сразу.
+  [new RegExp(GIT + String.raw`[\w-]+\b${ARGS}\s--no-verify\b`),
+    '--no-verify пропускает git-хуки проекта. Прочитай сообщение хука и исправь причину отказа'],
+  [new RegExp(GIT + String.raw`commit\b${ARGS}\s-[a-zA-Z]*n[a-zA-Z]*(?=\s|$)`),
+    'git commit -n пропускает git-хуки проекта. Прочитай сообщение хука и исправь причину отказа'],
+  [new RegExp(START + String.raw`git(?:\.exe)?\s+(?:-[cC]\s+\S+\s+)*-c\s+${HOOK_SETTINGS}=`, 'i'),
+    '-c core.hooksPath или -c merge.ff в команде отключает git-хуки проекта или включает fast-forward мимо них. Запусти команду без -c'],
+  // Чтение (git config core.hooksPath, git config --get merge.ff) проходит, запись и удаление нет.
+  [new RegExp(GIT + String.raw`config\b(?=${ARGS}\b${HOOK_SETTINGS}\b)(?=${ARGS}(?:\s--(?:unset|unset-all|add|replace-all|edit|remove-section|rename-section)\b|\s(?:set|unset|edit)\s|\b${HOOK_SETTINGS}\s+[^\s;&|]))`, 'i'),
+    'core.hooksPath и merge.ff подключают git-хуки проекта (docs/harness.md), агент их не меняет. Если настройка неверна, скажи пользователю'],
 ];
 
 // .env: блокируется любое упоминание файла в команде, кроме .env.example (запрет по умолчанию:
@@ -43,11 +54,12 @@ const DANGEROUS_COMMANDS = [
 // в одинарных кавычках или в двойных без $ и `: в "$(cat .env)" оболочка выполнила бы чтение.
 const ENV_FILE = /(?<![\w.-])\.env(?![\w.-])/;
 const MESSAGE = /\s(?:-m|--message)(?:\s+|=)(?:'[^']*'|"[^"$`]*")/g;
+const HARMLESS_REDIRECT = /\d?>>?\s*(?:&\d|\/dev\/null|\$null|nul\b)/gi;
 
 // На Windows у Claude Code есть отдельный инструмент PowerShell, команды в нём те же.
 if (call.tool_name === 'Bash' || call.tool_name === 'PowerShell') {
-  // Сообщение коммита ничего не выполняет: упоминание .env или флага в нём не повод для отказа.
-  const command = (call.tool_input.command || '').replace(MESSAGE, ' ');
+  // Сообщение коммита и перенаправления в никуда (2>&1, >/dev/null, 2>$null) ничего не выполняют и не пишут.
+  const command = (call.tool_input.command || '').replace(MESSAGE, ' ').replace(HARMLESS_REDIRECT, ' ');
   for (const [pattern, reason] of DANGEROUS_COMMANDS) {
     if (pattern.test(command)) deny(reason);
   }
