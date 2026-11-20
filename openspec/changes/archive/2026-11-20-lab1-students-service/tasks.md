@@ -76,6 +76,6 @@
 
 ## Workflow follow-up
 
-- [x] Изменение архивировано (`27a633b`), `feature/lab1-students` влита в dev через `git merge --no-ff` (`2cef47c`)
-- [ ] При сдаче: аннотированный тег `lab1` на dev
-- [ ] После приёмки: `git merge --no-ff lab1` в master
+- Изменение архивировано (`27a633b`), `feature/lab1-students` влита в dev через `git merge --no-ff` (`2cef47c`).
+- При сдаче: аннотированный тег `lab1` на dev.
+- После приёмки: `git merge --no-ff lab1` в master.
