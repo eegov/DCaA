@@ -8,10 +8,24 @@ const path = require('node:path');
 
 const call = JSON.parse(readFileSync(0, 'utf8'));
 const projectDir = process.env.CLAUDE_PROJECT_DIR || call.cwd;
+const CHANGELOG_DIR = 'src/main/resources/db/changelog/';
+const CHANGELOG_MASTER = 'db.changelog-master.yaml';
 
 function deny(reason) {
   process.stderr.write(`Заблокировано хуком .claude/hooks/guard.js: ${reason}\n`);
   process.exit(2);
+}
+
+// Changeset-файлы, которые уже есть в dev: Liquibase хранит checksum каждого применённого changeset,
+// после правки приложение не стартует с ValidationFailedException на любой БД, где миграция уже прошла.
+function changesetsInDev() {
+  try {
+    return execFileSync('git', ['ls-tree', '-r', '--name-only', 'dev', '--', CHANGELOG_DIR],
+      { cwd: projectDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+      .split('\n').filter((f) => f && !f.endsWith(CHANGELOG_MASTER));
+  } catch {
+    return [];
+  }
 }
 
 // Шаблоны команд привязаны к началу команды (после ; & | ( { или перевода строки), чтобы не срабатывать
@@ -56,6 +70,30 @@ const ENV_FILE = /(?<![\w.-])\.env(?![\w.-])/;
 const MESSAGE = /\s(?:-m|--message)(?:\s+|=)(?:'[^']*'|"[^"$`]*")/g;
 const HARMLESS_REDIRECT = /\d?>>?\s*(?:&\d|\/dev\/null|\$null|nul\b)/gi;
 
+// Влитые миграции через оболочку: команда, которая упоминает каталог changelog или имя уже влитого
+// changeset, проходит, только если каждая её часть (между ; && || |) начинается с команды, которая
+// не меняет файлы, и в команде нет перенаправления в файл. Запрет по умолчанию: способов записать
+// файл (sed -i, tee, Set-Content, Out-File, mv, cp, [IO.File]::WriteAllText, python -c...) больше,
+// чем способов его прочитать. Цена: sed -n, awk и bash -c с таким путём тоже не пройдут.
+const KEEPS_FILES = new Set(['cat', 'type', 'get-content', 'gc', 'head', 'tail', 'less', 'more', 'grep', 'egrep',
+  'fgrep', 'rg', 'findstr', 'select-string', 'sls', 'wc', 'diff', 'ls', 'dir', 'get-childitem', 'gci',
+  'cd', 'set-location', 'sl', 'pushd', 'popd', 'echo', 'write-output']);
+const GIT_KEEPS_FILES = new Set(['diff', 'log', 'show', 'blame', 'status', 'grep', 'ls-files', 'ls-tree',
+  'cat-file', 'add', 'commit']);
+
+function keepsFiles(command) {
+  if (command.includes('>')) return false;
+  return command.split(/&&|\|\||[;|&\n]/).every((part) => {
+    const words = part.trim().replace(/^[({!\s]+/, '').replace(/^(?:\w+=\S*\s+)+/, '').split(/\s+/);
+    const program = words[0].toLowerCase().replace(/\.exe$/, '');
+    if (program === '') return true;
+    if (program !== 'git') return KEEPS_FILES.has(program);
+    let i = 1;
+    while (/^-[cC]$/.test(words[i])) i += 2;
+    return GIT_KEEPS_FILES.has(words[i]);
+  });
+}
+
 // На Windows у Claude Code есть отдельный инструмент PowerShell, команды в нём те же.
 if (call.tool_name === 'Bash' || call.tool_name === 'PowerShell') {
   // Сообщение коммита и перенаправления в никуда (2>&1, >/dev/null, 2>$null) ничего не выполняют и не пишут.
@@ -66,25 +104,21 @@ if (call.tool_name === 'Bash' || call.tool_name === 'PowerShell') {
   if (ENV_FILE.test(command)) {
     deny('в .env лежат локальные пароли, агент их не читает. Пример значений в .env.example');
   }
+  // Имя файла без каталога ловит cd в changelog и запись по короткому имени; git вызывается,
+  // только если в команде есть похожее расширение.
+  const touchesChangelog = /db[\\/]+changelog/i.test(command) || (/\.(?:sql|ya?ml|xml|json)\b/i.test(command)
+    && changesetsInDev().some((f) => command.includes(path.posix.basename(f))));
+  if (touchesChangelog && !keepsFiles(command)) {
+    deny('команда может изменить влитый changeset Liquibase, а его checksum уже записан в БД. '
+      + 'Читать можно: cat, Get-Content, grep, git diff/log/show. Новый changeset создай инструментом Write '
+      + 'по образцу 001 и подключи его в db.changelog-master.yaml инструментом Edit');
+  }
   process.exit(0);
 }
 
 // Edit / Write / MultiEdit: changeset, который уже есть в ветке dev, менять нельзя.
-// Liquibase хранит checksum каждого применённого changeset; после правки приложение не стартует
-// с ошибкой ValidationFailedException на любой БД, где миграция уже прошла.
 const relative = path.relative(projectDir, call.tool_input.file_path || '').split(path.sep).join('/');
-const isChangeset = relative.startsWith('src/main/resources/db/changelog/')
-  && !relative.endsWith('db.changelog-master.yaml');
-
-if (isChangeset) {
-  let existsInDev = true;
-  try {
-    execFileSync('git', ['cat-file', '-e', `dev:${relative}`], { cwd: projectDir, stdio: 'ignore' });
-  } catch {
-    existsInDev = false;
-  }
-  if (existsInDev) {
-    deny(`${relative} уже влит в dev и мог быть применён. Создай новый changeset по образцу 001 и подключи его в db.changelog-master.yaml`);
-  }
+if (changesetsInDev().includes(relative)) {
+  deny(`${relative} уже влит в dev и мог быть применён. Создай новый changeset по образцу 001 и подключи его в db.changelog-master.yaml`);
 }
 process.exit(0);
