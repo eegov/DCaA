@@ -36,8 +36,8 @@
 - JDK 25: для запуска сервиса на хосте и тестов. Maven ставить не нужно.
 - PostgreSQL 10+ (проверено на 18): только для режима без Docker.
 
-Настройки по умолчанию лежат в `.env.example`. Если нужно что-то поменять (например, порт 5432 занят),
-скопируй его в `.env`: этот файл читают и Compose, и локально запущенный сервис.
+Настройки по умолчанию лежат в `.env.example`. Чтобы их поменять (например, если порт 5432 занят),
+скопируйте файл в `.env` и правьте там: `.env` читают и Compose, и сервис, запущенный на хосте.
 
 ## Запуск
 
@@ -58,13 +58,33 @@ docker compose up -d db
 .\mvnw.cmd spring-boot:run
 ```
 Команды для Linux и macOS указаны в начале `docs/sql/create-local-db.sql`. Если PostgreSQL слушает не 5432,
-задай `DB_PORT` в `.env`. Схему, как и в других режимах, создаст Liquibase при старте.
+задайте `DB_PORT` в `.env`. Схему, как и в других режимах, создаст Liquibase при старте.
 
-Проверка: `curl.exe http://localhost:8080/api/students` возвращает `[]` (или список студентов).
-Swagger UI: http://localhost:8080/swagger-ui.html
+Чтобы убедиться, что сервис работает, выполните `curl.exe http://localhost:8080/api/students`
+(в Linux и macOS просто `curl`): ответом будет `[]` или список студентов.
+Swagger UI открывается по адресу http://localhost:8080/swagger-ui.html.
 
-Остановить с сохранением данных: `docker compose --profile app down`.
-С флагом `-v` удалится и volume с данными.
+Контейнеры останавливает `docker compose --profile app down`, данные при этом остаются в volume.
+С флагом `-v` volume удалится вместе с данными.
+
+## Как заглянуть в БД
+
+Таблицу `students` создаёт Liquibase при первом старте сервиса, поэтому до запуска сервиса БД пустая.
+Подключение через `psql` (пароль `students`, если не меняли `.env`):
+
+| Где PostgreSQL | Команда |
+|---|---|
+| Docker | `docker compose exec db psql -U students -d students` |
+| Windows | `& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -h 127.0.0.1 -U students -d students` |
+| Linux, WSL, macOS | `psql -h localhost -U students -d students` |
+
+Если порт отличается от 5432, добавьте `-p <порт>`. Ключ `-h` в Linux обязателен: без него psql идёт через
+Unix-сокет и проверяет, совпадает ли имя пользователя ОС с ролью (peer), и вход под `students` не пройдёт.
+
+Внутри psql: `\dt` показывает таблицы, `\d students` структуру, `SELECT * FROM students;` данные, `\q` выход.
+
+Тестовые данные (200 000 студентов) добавляет `docs/sql/seed-students.sql`: та же команда подключения
+плюс `-f docs/sql/seed-students.sql`. Удалить их: `DELETE FROM students WHERE record_book_number LIKE 'SEED-%';`
 
 ## Тесты
 
