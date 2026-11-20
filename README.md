@@ -31,9 +31,8 @@
 Работает одинаково на Windows, Linux и macOS. Различается только имя Maven Wrapper:
 `.\mvnw.cmd` в PowerShell, `./mvnw` в bash/zsh.
 
-- Docker Desktop или Docker Engine с Compose v2: для режимов с контейнерами и для интеграционных тестов.
+- Docker Desktop или Docker Engine с Compose v2: БД всегда работает в контейнере, интеграционные тесты тоже поднимают её в Docker.
 - JDK 25: для запуска сервиса на хосте и тестов. Maven ставить не нужно.
-- PostgreSQL 10+ (проверено на 18): только для режима без Docker.
 
 Настройки по умолчанию лежат в `.env.example`. Чтобы их поменять (например, если порт 5432 занят),
 скопируйте файл в `.env` и правьте там: `.env` читают и Compose, и сервис, запущенный на хосте.
@@ -51,21 +50,6 @@ docker compose up -d db
 .\mvnw.cmd spring-boot:run        # Linux/macOS: ./mvnw spring-boot:run
 ```
 
-**Без Docker** (PostgreSQL установлена на компьютер):
-```powershell
-& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres -f docs\sql\create-local-db.sql   # один раз
-.\mvnw.cmd spring-boot:run
-```
-Команды для Linux и macOS указаны в начале `docs/sql/create-local-db.sql`. Если PostgreSQL слушает не 5432,
-задайте `DB_PORT` в `.env`. Схему, как и в других режимах, создаст Liquibase при старте.
-
-Если в `.env` стоит `DB_PORT=55432` для Docker-базы, а сервис нужно запустить с установленной PostgreSQL,
-`.env` править не нужно: переменная окружения важнее файла. Задайте порт только для текущей сессии PowerShell:
-```powershell
-$env:DB_PORT = "5432"; .\mvnw.cmd spring-boot:run      # Linux/macOS: DB_PORT=5432 ./mvnw spring-boot:run
-```
-Если на 8080 уже работает сервис в контейнере, добавьте `$env:SERVER_PORT = "8081"`. Данные у двух баз разные.
-
 Чтобы убедиться, что сервис работает, выполните `curl.exe http://localhost:8080/api/students`
 (в Linux и macOS просто `curl`): ответом будет `[]` или список студентов.
 Swagger UI открывается по адресу http://localhost:8080/swagger-ui.html.
@@ -80,30 +64,18 @@ Swagger UI открывается по адресу http://localhost:8080/swagge
 ## Как заглянуть в БД
 
 Таблицу `students` создаёт Liquibase при первом старте сервиса, поэтому до запуска сервиса БД пустая.
-Подключаться нужно к той БД, с которой работает сервис, а она зависит от режима запуска:
-
-| Режим запуска | Где БД | Порт на хосте |
-|---|---|---|
-| Всё в Docker; сервис локально, БД в Docker | контейнер `db` | `DB_PORT` из `.env`, по умолчанию 5432 |
-| Без Docker | PostgreSQL, установленная на компьютер | 5432, если при установке не меняли |
-
-Если на компьютере есть и установленная PostgreSQL, и Docker-база, у них разные порты (например, Docker
-на 55432), и `psql` без `-p` попадёт в установленную PostgreSQL, а не в контейнер с данными сервиса.
-
-Подключение (пароль `students`, если не меняли `.env`), порт из таблицы:
+БД в обоих режимах работает в контейнере `db`, psql запускается внутри него, ставить его на компьютер не нужно:
 ```powershell
-psql -h 127.0.0.1 -p 5432 -U students -d students
+docker compose exec db psql -U students -d students
 ```
-В Windows `psql` может не быть в `PATH`, тогда полный путь: `& "C:\Program Files\PostgreSQL\18\bin\psql.exe"`.
-В Linux ключ `-h` обязателен: без него psql идёт через Unix-сокет и проверяет, совпадает ли имя пользователя ОС
-с ролью (peer), и вход под `students` не пройдёт. К Docker-базе можно подключиться и без psql на хосте:
-`docker compose exec db psql -U students -d students`.
-
 Внутри psql: `\dt` показывает таблицы, `\d students` структуру, `SELECT * FROM students;` данные, `\q` выход.
 
-Тестовые данные (100 студентов) добавляет `docs/sql/seed-students.sql`: команда подключения с хоста
-плюс `-f docs/sql/seed-students.sql`. Через `docker compose exec` так не выйдет: файл лежит на хосте,
-а не в контейнере. Удалить данные: `DELETE FROM students WHERE record_book_number LIKE 'SEED-%';`
+Тестовые данные (100 студентов) лежат в `docs/sql/seed-students.sql`. Файл нужно сначала скопировать в контейнер:
+```powershell
+docker compose cp docs/sql/seed-students.sql db:/tmp/seed.sql
+docker compose exec db psql -U students -d students -f /tmp/seed.sql
+```
+Удалить их: `DELETE FROM students WHERE record_book_number LIKE 'SEED-%';` внутри psql.
 
 ## Тесты
 
