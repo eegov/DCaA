@@ -65,10 +65,24 @@ const DANGEROUS_COMMANDS = [
 ];
 
 // .env: блокируется любое упоминание файла в команде, кроме .env.example (запрет по умолчанию:
-// читателей слишком много, от cat до node -e). Сообщение -m/--message правила не видят, если оно
-// в одинарных кавычках или в двойных без $ и `: в "$(cat .env)" оболочка выполнила бы чтение.
+// читателей слишком много, от cat до node -e).
 const ENV_FILE = /(?<![\w.-])\.env(?![\w.-])/;
-const MESSAGE = /\s(?:-m|--message)(?:\s+|=)(?:'[^']*'|"[^"$`]*")/g;
+
+// Сообщение -m/--message у git commit, tag и merge ничего не выполняет, поэтому правила его не видят.
+// Срезаются только формы без подстановки команд: '...', "..." без $( ` и \ (в "$(cat .env)" оболочка
+// выполнила бы чтение) и heredoc с разделителем в кавычках в "$(cat <<'EOF' ... EOF)", так коммитит Claude Code.
+const GIT_MESSAGE = new RegExp(String.raw`(${GIT}(?:commit|tag|merge)\b[^;&|\n]*?)\s(?:-m|--message)(?:\s+|=)`
+  + String.raw`(?:'[^']*'|"(?:[^"$\x60\\]|\$(?!\())*"|"\$\(cat\s+<<-?\s*'(\w+)'[ \t]*\n[\s\S]*?\n[ \t]*\2[ \t]*\n\s*\)")`);
+
+function withoutGitMessages(command) {
+  let previous;
+  do {
+    previous = command;
+    command = command.replace(GIT_MESSAGE, '$1 ');
+  } while (command !== previous);
+  return command;
+}
+
 const HARMLESS_REDIRECT = /\d?>>?\s*(?:&\d|\/dev\/null|\$null|nul\b)/gi;
 
 // Влитые миграции через оболочку: команда, которая упоминает каталог changelog или имя уже влитого
@@ -98,7 +112,7 @@ function keepsFiles(command) {
 // На Windows у Claude Code есть отдельный инструмент PowerShell, команды в нём те же.
 if (call.tool_name === 'Bash' || call.tool_name === 'PowerShell') {
   // Сообщение коммита и перенаправления в никуда (2>&1, >/dev/null, 2>$null) ничего не выполняют и не пишут.
-  const command = (call.tool_input.command || '').replace(MESSAGE, ' ').replace(HARMLESS_REDIRECT, ' ');
+  const command = withoutGitMessages(call.tool_input.command || '').replace(HARMLESS_REDIRECT, ' ');
   for (const [pattern, reason] of DANGEROUS_COMMANDS) {
     if (pattern.test(command)) deny(reason);
   }
