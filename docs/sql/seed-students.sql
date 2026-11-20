@@ -1,5 +1,8 @@
+SET client_encoding = 'UTF8';
+-- Файл в UTF-8. Строка выше нужна для psql в консоли Windows: без неё он читает файл в кодировке консоли
+-- (WIN1251 или CP866), и русские фамилии ломают INSERT.
 -- Демонстрационные данные: 200 000 студентов, 72 группы по ~2800 человек.
--- Запускать в pgAdmin (Query Tool) на БД students после старта сервиса.
+-- Запускать на БД students после старта сервиса: psql (команды в README) или pgAdmin (Query Tool).
 -- Удалить: DELETE FROM students WHERE record_book_number LIKE 'SEED-%';
 INSERT INTO students (record_book_number, last_name, first_name, middle_name, group_name, course, status)
 SELECT 'SEED-' || g,
