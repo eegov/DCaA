@@ -94,7 +94,7 @@ psql -h 127.0.0.1 -p 5432 -U students -d students
 
 Внутри psql: `\dt` показывает таблицы, `\d students` структуру, `SELECT * FROM students;` данные, `\q` выход.
 
-Тестовые данные (200 000 студентов) добавляет `docs/sql/seed-students.sql`: команда подключения с хоста
+Тестовые данные (100 студентов) добавляет `docs/sql/seed-students.sql`: команда подключения с хоста
 плюс `-f docs/sql/seed-students.sql`. Через `docker compose exec` так не выйдет: файл лежит на хосте,
 а не в контейнере. Удалить данные: `DELETE FROM students WHERE record_book_number LIKE 'SEED-%';`
 
