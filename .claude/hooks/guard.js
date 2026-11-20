@@ -34,7 +34,7 @@ function changesetsInDev() {
 const START = String.raw`(?:^|[;&|({\n]\s*)(?:\w+=\S*\s+)*`;
 const GIT = START + String.raw`git(?:\.exe)?(?:\s+-[cC]\s+\S+)*\s+`;
 const ARGS = String.raw`[^;&|\n]*`;
-const HOOK_SETTINGS = String.raw`(?:core\.hookspath|merge\.ff)`;
+const HOOK_SETTINGS = String.raw`(?:core\.hookspath|merge\.ff|branch\.[^\s=]+?\.mergeoptions)`;
 
 // Опасные команды: [шаблон, причина и что делать вместо этого].
 const DANGEROUS_COMMANDS = [
@@ -52,16 +52,22 @@ const DANGEROUS_COMMANDS = [
   // merge.ff=false это закрывает, но --ff, --ff-only и -c merge.ff=true в команде сильнее настройки.
   [new RegExp(GIT + String.raw`merge(?![\w-])(?!${ARGS}\s--(?:no-ff|abort|continue|quit)\b)`),
     'git merge без --no-ff может пройти fast-forward мимо хука pre-merge-commit. Добавь --no-ff'],
+  [new RegExp(GIT + String.raw`merge\b${ARGS}\s--ff[\w-]*(?=\s|$)`),
+    '--ff и --ff-only сильнее --no-ff, если стоят после него, и merge пройдёт fast-forward мимо pre-merge-commit. Оставь только --no-ff'],
   // Git-хуки (.githooks/) проверяют ветку, формат коммита и отчёт ревью. Их отключение снимает все проверки сразу.
-  [new RegExp(GIT + String.raw`[\w-]+\b${ARGS}\s--no-verify\b`),
+  // git принимает сокращение опции, поэтому ловим и --no-veri, и --no-v.
+  [new RegExp(GIT + String.raw`[\w-]+\b${ARGS}\s--no-v(?:e(?:r(?:i(?:f(?:y)?)?)?)?)?(?=\s|$)`),
     '--no-verify пропускает git-хуки проекта. Прочитай сообщение хука и исправь причину отказа'],
+  [/\bGIT_CONFIG_(?:COUNT|KEY_\d+|VALUE_\d+|PARAMETERS)\s*=/i,
+    'переменные GIT_CONFIG_* задают настройки git в обход git config и могут отключить хуки проекта. Запусти команду без них'],
   [new RegExp(GIT + String.raw`commit\b${ARGS}\s-[a-zA-Z]*n[a-zA-Z]*(?=\s|$)`),
     'git commit -n пропускает git-хуки проекта. Прочитай сообщение хука и исправь причину отказа'],
   [new RegExp(START + String.raw`git(?:\.exe)?\s+(?:-[cC]\s+\S+\s+)*-c\s+${HOOK_SETTINGS}=`, 'i'),
-    '-c core.hooksPath или -c merge.ff в команде отключает git-хуки проекта или включает fast-forward мимо них. Запусти команду без -c'],
+    '-c core.hooksPath, merge.ff или branch.<имя>.mergeoptions в команде отключает git-хуки проекта или включает fast-forward мимо них. Запусти команду без -c'],
   // Чтение (git config core.hooksPath, git config --get merge.ff) проходит, запись и удаление нет.
+  // branch.<имя>.mergeoptions с --ff включил бы fast-forward для merge в эту ветку.
   [new RegExp(GIT + String.raw`config\b(?=${ARGS}\b${HOOK_SETTINGS}\b)(?=${ARGS}(?:\s--(?:unset|unset-all|add|replace-all|edit|remove-section|rename-section)\b|\s(?:set|unset|edit)\s|\b${HOOK_SETTINGS}\s+[^\s;&|]))`, 'i'),
-    'core.hooksPath и merge.ff подключают git-хуки проекта (docs/harness.md), агент их не меняет. Если настройка неверна, скажи пользователю'],
+    'core.hooksPath, merge.ff и branch.<имя>.mergeoptions определяют, сработают ли git-хуки проекта (docs/harness.md), агент их не меняет. Если настройка неверна, скажи пользователю'],
 ];
 
 // .env: блокируется любое упоминание файла в команде, кроме .env.example (запрет по умолчанию:
