@@ -6,7 +6,7 @@ const { execFileSync } = require('node:child_process');
 const { readFileSync } = require('node:fs');
 const path = require('node:path');
 
-// PowerShell 5.1 при ручной проверке (docs/harness.md) отдаёт строку в конвейер с BOM.
+// Ручная проверка из docs/harness.md: если в PowerShell 5.1 $OutputEncoding равен UTF-8, строка приходит с BOM.
 const call = JSON.parse(readFileSync(0, 'utf8').replace(/^\uFEFF/, ''));
 const projectDir = process.env.CLAUDE_PROJECT_DIR || call.cwd;
 const CHANGELOG_DIR = 'src/main/resources/db/changelog/';
