@@ -59,6 +59,13 @@ docker compose up -d db
 Команды для Linux и macOS указаны в начале `docs/sql/create-local-db.sql`. Если PostgreSQL слушает не 5432,
 задайте `DB_PORT` в `.env`. Схему, как и в других режимах, создаст Liquibase при старте.
 
+Если в `.env` стоит `DB_PORT=55432` для Docker-базы, а сервис нужно запустить с установленной PostgreSQL,
+`.env` править не нужно: переменная окружения важнее файла. Задайте порт только для текущей сессии PowerShell:
+```powershell
+$env:DB_PORT = "5432"; .\mvnw.cmd spring-boot:run      # Linux/macOS: DB_PORT=5432 ./mvnw spring-boot:run
+```
+Если на 8080 уже работает сервис в контейнере, добавьте `$env:SERVER_PORT = "8081"`. Данные у двух баз разные.
+
 Чтобы убедиться, что сервис работает, выполните `curl.exe http://localhost:8080/api/students`
 (в Linux и macOS просто `curl`): ответом будет `[]` или список студентов.
 Swagger UI открывается по адресу http://localhost:8080/swagger-ui.html.
