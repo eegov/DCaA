@@ -3,7 +3,7 @@
 Лабораторные работы по курсу «Распределённые вычисления и приложения», вариант 2.
 Сейчас реализована **лабораторная 1**: основной сервис учёта студентов.
 
-- Требования преподавателя: [docs/labs-requirements.md](docs/labs-requirements.md)
+- Требования: [docs/labs-requirements.md](docs/labs-requirements.md)
 - Спецификация поведения: [openspec/specs/](openspec/specs/); изменение лабы 1 с решениями и задачами:
   [openspec/changes/archive/2026-11-20-lab1-students-service/](openspec/changes/archive/2026-11-20-lab1-students-service/)
 - Как устроена агентская обвязка и как её подключить после клонирования: [docs/harness.md](docs/harness.md)
