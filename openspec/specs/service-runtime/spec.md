@@ -21,17 +21,6 @@
 - **WHEN** клиент открывает `/swagger-ui.html` и `/v3/api-docs`
 - **THEN** страница Swagger доступна, а OpenAPI содержит пути `/api/students` и `/api/students/{id}`
 
-### Requirement: Локальный запуск
-Система SHALL запускаться локально (JVM на хосте) с PostgreSQL в Docker-контейнере или установленной на хост.
-
-#### Scenario: Локальный сервис и контейнерная БД
-- **WHEN** разработчик выполняет `docker compose up -d db` и запускает сервис через Maven Wrapper
-- **THEN** сервис подключается к БД через опубликованный порт и отвечает на `GET /api/students`
-
-#### Scenario: Без Docker
-- **WHEN** на хосте установлена PostgreSQL, создан пользователь и БД из `docs/sql/create-local-db.sql`, сервис запущен через Maven Wrapper
-- **THEN** Liquibase создаёт схему и сервис отвечает на `GET /api/students`
-
 ### Requirement: Кроссплатформенность
 Система SHALL собираться и запускаться на Windows, Linux и macOS одними и теми же шагами;
 различается только имя Maven Wrapper (`mvnw.cmd` или `mvnw`).
@@ -46,3 +35,10 @@
 #### Scenario: Полный контейнерный запуск
 - **WHEN** разработчик выполняет `docker compose --profile app up -d --build`
 - **THEN** сервис подключается к `db:5432` внутри сети `students` и отвечает на `GET /api/students`
+
+### Requirement: Локальный запуск с БД в контейнере
+Система SHALL запускаться локально (JVM на хосте) с PostgreSQL в Docker-контейнере.
+
+#### Scenario: Локальный сервис и контейнерная БД
+- **WHEN** разработчик выполняет `docker compose up -d db` и запускает сервис через Maven Wrapper
+- **THEN** сервис подключается к БД через опубликованный порт и отвечает на `GET /api/students`
