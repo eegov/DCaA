@@ -167,7 +167,7 @@ if (call.tool_name === 'Bash' || call.tool_name === 'PowerShell') {
 
 // Edit / Write / MultiEdit: changeset, который уже есть в ветке dev, менять нельзя.
 const relative = path.relative(projectDir, call.tool_input.file_path || '').split(path.sep).join('/');
-if (changesetsInDev().includes(relative)) {
+if (relative.startsWith(CHANGELOG_DIR) && changesetsInDev().includes(relative)) {
   deny(`${relative} уже влит в dev и мог быть применён. Создай новый changeset по образцу 001 и подключи его в db.changelog-master.yaml`);
 }
 process.exit(0);
