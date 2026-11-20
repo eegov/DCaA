@@ -67,6 +67,25 @@ Swagger UI открывается по адресу http://localhost:8080/swagge
 Контейнеры останавливает `docker compose --profile app down`, данные при этом остаются в volume.
 С флагом `-v` volume удалится вместе с данными.
 
+## Как заглянуть в БД
+
+Таблицу `students` создаёт Liquibase при первом старте сервиса, поэтому до запуска сервиса БД пустая.
+Подключение через `psql` (пароль `students`, если не меняли `.env`):
+
+| Где PostgreSQL | Команда |
+|---|---|
+| Docker | `docker compose exec db psql -U students -d students` |
+| Windows | `& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -h 127.0.0.1 -U students -d students` |
+| Linux, WSL, macOS | `psql -h localhost -U students -d students` |
+
+Если порт отличается от 5432, добавьте `-p <порт>`. Ключ `-h` в Linux обязателен: без него psql идёт через
+Unix-сокет и проверяет, совпадает ли имя пользователя ОС с ролью (peer), и вход под `students` не пройдёт.
+
+Внутри psql: `\dt` показывает таблицы, `\d students` структуру, `SELECT * FROM students;` данные, `\q` выход.
+
+Тестовые данные (200 000 студентов) добавляет `docs/sql/seed-students.sql`: та же команда подключения
+плюс `-f docs/sql/seed-students.sql`. Удалить их: `DELETE FROM students WHERE record_book_number LIKE 'SEED-%';`
+
 ## Тесты
 
 ```powershell
