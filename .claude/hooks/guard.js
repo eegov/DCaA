@@ -17,7 +17,7 @@ function deny(reason) {
 // Шаблоны команд привязаны к началу команды (после ; & | ( { или перевода строки), чтобы не срабатывать
 // на тот же текст внутри grep, echo или commit -m. ARGS: аргументы до конца этой команды.
 const START = String.raw`(?:^|[;&|({\n]\s*)(?:\w+=\S*\s+)*`;
-const GIT = START + String.raw`git(?:\s+-[cC]\s+\S+)*\s+`;
+const GIT = START + String.raw`git(?:\.exe)?(?:\s+-[cC]\s+\S+)*\s+`;
 const ARGS = String.raw`[^;&|\n]*`;
 
 // Опасные команды: [шаблон, причина и что делать вместо этого].
@@ -30,7 +30,7 @@ const DANGEROUS_COMMANDS = [
     'force push переписывает общую историю. Делай новый коммит поверх'],
   [new RegExp(GIT + String.raw`reset\b${ARGS}\s--hard\b`),
     'reset --hard без возврата теряет незакоммиченную работу. Используй git stash'],
-  [new RegExp(GIT + String.raw`clean\b${ARGS}\s(?:-\w*f|--force)\b`),
+  [new RegExp(GIT + String.raw`clean\b${ARGS}\s(?:-\w*f\w*|--force)\b`),
     'git clean удаляет неотслеживаемые файлы без возврата'],
   // При fast-forward merge-коммита нет, и шлюз pre-merge-commit (отчёт ревью) не срабатывает.
   // merge.ff=false это закрывает, но --ff, --ff-only и -c merge.ff=true в команде сильнее настройки.
