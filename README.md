@@ -73,21 +73,30 @@ Swagger UI открывается по адресу http://localhost:8080/swagge
 ## Как заглянуть в БД
 
 Таблицу `students` создаёт Liquibase при первом старте сервиса, поэтому до запуска сервиса БД пустая.
-Подключение через `psql` (пароль `students`, если не меняли `.env`):
+Подключаться нужно к той БД, с которой работает сервис, а она зависит от режима запуска:
 
-| Где PostgreSQL | Команда |
-|---|---|
-| Docker | `docker compose exec db psql -U students -d students` |
-| Windows | `& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -h 127.0.0.1 -U students -d students` |
-| Linux, WSL, macOS | `psql -h localhost -U students -d students` |
+| Режим запуска | Где БД | Порт на хосте |
+|---|---|---|
+| Всё в Docker; сервис локально, БД в Docker | контейнер `db` | `DB_PORT` из `.env`, по умолчанию 5432 |
+| Без Docker | PostgreSQL, установленная на компьютер | 5432, если при установке не меняли |
 
-Если порт отличается от 5432, добавьте `-p <порт>`. Ключ `-h` в Linux обязателен: без него psql идёт через
-Unix-сокет и проверяет, совпадает ли имя пользователя ОС с ролью (peer), и вход под `students` не пройдёт.
+Если на компьютере есть и установленная PostgreSQL, и Docker-база, у них разные порты (например, Docker
+на 55432), и `psql` без `-p` попадёт в установленную PostgreSQL, а не в контейнер с данными сервиса.
+
+Подключение (пароль `students`, если не меняли `.env`), порт из таблицы:
+```powershell
+psql -h 127.0.0.1 -p 5432 -U students -d students
+```
+В Windows `psql` может не быть в `PATH`, тогда полный путь: `& "C:\Program Files\PostgreSQL\18\bin\psql.exe"`.
+В Linux ключ `-h` обязателен: без него psql идёт через Unix-сокет и проверяет, совпадает ли имя пользователя ОС
+с ролью (peer), и вход под `students` не пройдёт. К Docker-базе можно подключиться и без psql на хосте:
+`docker compose exec db psql -U students -d students`.
 
 Внутри psql: `\dt` показывает таблицы, `\d students` структуру, `SELECT * FROM students;` данные, `\q` выход.
 
-Тестовые данные (200 000 студентов) добавляет `docs/sql/seed-students.sql`: та же команда подключения
-плюс `-f docs/sql/seed-students.sql`. Удалить их: `DELETE FROM students WHERE record_book_number LIKE 'SEED-%';`
+Тестовые данные (200 000 студентов) добавляет `docs/sql/seed-students.sql`: команда подключения с хоста
+плюс `-f docs/sql/seed-students.sql`. Через `docker compose exec` так не выйдет: файл лежит на хосте,
+а не в контейнере. Удалить данные: `DELETE FROM students WHERE record_book_number LIKE 'SEED-%';`
 
 ## Тесты
 
