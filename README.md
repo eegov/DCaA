@@ -7,7 +7,6 @@
 - Спецификация поведения: [openspec/specs/](openspec/specs/); изменение лабы 1 с решениями и задачами:
   [openspec/changes/archive/2026-11-20-lab1-students-service/](openspec/changes/archive/2026-11-20-lab1-students-service/)
 - Как устроена агентская обвязка и как её подключить после клонирования: [docs/harness.md](docs/harness.md)
-- Сценарий демонстрации и pgAdmin: [docs/demo.md](docs/demo.md)
 
 ## Что умеет сервис
 
@@ -66,6 +65,10 @@ Swagger UI открывается по адресу http://localhost:8080/swagge
 
 Контейнеры останавливает `docker compose --profile app down`, данные при этом остаются в volume.
 С флагом `-v` volume удалится вместе с данными.
+
+Если сервис не стартует с ошибкой `password authentication failed`, значит volume создан раньше с другим
+паролем: образ PostgreSQL берёт пароль из `.env` только при первой инициализации пустого volume.
+Помогает `docker compose --profile app down -v` и снова `up` (данные при этом удалятся).
 
 ## Как заглянуть в БД
 
