@@ -1,11 +1,22 @@
 #!/bin/sh
 # Git-хук pre-commit: работает и для человека, и для агента (агент видит текст отказа в выводе git).
 branch=$(git branch --show-current)
-case "$branch" in
-  master|dev)
-    echo "pre-commit: прямые коммиты в $branch запрещены. Создай ветку: git switch -c feature/<имя> dev"
-    exit 1 ;;
-esac
+if [ "$branch" = dev ] && git rev-parse -q --verify MERGE_HEAD >/dev/null; then
+  # Завершение merge после конфликта (git commit, git merge --continue): git вызывает этот хук,
+  # а pre-merge-commit нет. Поэтому тот же шлюз запускается отсюда с тем, что git merge положил бы
+  # в GIT_REFLOG_ACTION. Имя ветки из MERGE_MSG («Merge branch 'X' into dev»), иначе из MERGE_HEAD.
+  merged=$(sed -n "1s/^Merge branch '\([^']*\)'.*/\1/p" "$(git rev-parse --git-path MERGE_MSG)")
+  [ -n "$merged" ] || merged=$(git name-rev --name-only --no-undefined --refs='refs/heads/*' MERGE_HEAD 2>/dev/null)
+  # Несколько строк в MERGE_HEAD: вливается сразу несколько веток, шлюз это отклонит.
+  [ "$(wc -l < "$(git rev-parse --git-path MERGE_HEAD)")" -le 1 ] || merged="$merged и другие"
+  GIT_REFLOG_ACTION="merge $merged" sh "$(dirname "$0")/pre-merge-commit" || exit 1
+else
+  case "$branch" in
+    master|dev)
+      echo "pre-commit: прямые коммиты в $branch запрещены. Создай ветку: git switch -c feature/<имя> dev"
+      exit 1 ;;
+  esac
+fi
 
 if git diff --cached --name-only | grep -qE '(^|/)\.env$'; then
   echo "pre-commit: .env содержит локальные пароли и не коммитится. Значения-примеры храни в .env.example"

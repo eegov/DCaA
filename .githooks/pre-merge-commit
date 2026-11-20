@@ -3,6 +3,7 @@
 # Ветку feature/* или fix/* нельзя влить в dev без отчёта ревью docs/reviews/<ветка>.md,
 # который пишет субагент-ревьюер в чистом контексте (скилл code-review): последний раунд
 # без blocker и major, после него пройдено схлопывание, после коммита с отчётом код не менялся.
+# Ветка chore/* проходит без отчёта, если не трогает src/, pom.xml, Dockerfile и compose.yaml.
 # Хук срабатывает только при создании merge-коммита. Fast-forward закрыт настройкой merge.ff=false
 # (docs/harness.md) и правилом guard.js для агента; git merge --ff-only человека этот хук не остановит.
 [ "$(git branch --show-current)" = "dev" ] || exit 0
@@ -18,9 +19,20 @@ fail() {
 # Запрет по умолчанию: pull, merge по sha, refs/heads/..., удалённые ветки и несколько веток сразу не проходят.
 case "$GIT_REFLOG_ACTION" in
   "merge "*" "*) fail "в dev вливается одна ветка за раз." "Получено: $GIT_REFLOG_ACTION" ;;
-  "merge chore/"*) exit 0 ;;
-  "merge feature/"*|"merge fix/"*) merged=${GIT_REFLOG_ACTION#merge } ;;
+  "merge chore/"*|"merge feature/"*|"merge fix/"*) merged=${GIT_REFLOG_ACTION#merge } ;;
   *) fail "в dev вливается только локальная ветка: git merge --no-ff feature/<имя>" "Получено: $GIT_REFLOG_ACTION" ;;
+esac
+
+# chore/* идёт без отчёта ревью, поэтому через него не проходят код, миграции, сборка и запуск
+# (src/, pom.xml, Dockerfile, compose.yaml: последние два реализуют сценарии service-runtime).
+# CLAUDE.md, «Инварианты». HEAD здесь ещё dev.
+case "$merged" in
+  chore/*)
+    code=$(git -c core.quotepath=off diff --no-renames --name-only "HEAD...$merged" -- src pom.xml Dockerfile compose.yaml)
+    [ -z "$code" ] ||
+      fail "ветка $merged меняет код, сборку или запуск: $(echo $code)" \
+           "Перенеси эти правки в feature/<имя> или fix/<имя> от dev и пройди скилл code-review; если меняется поведение, сначала OpenSpec (propose, apply)."
+    exit 0 ;;
 esac
 
 report="docs/reviews/$(echo "$merged" | tr '/' '-').md"

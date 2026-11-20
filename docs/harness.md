@@ -14,6 +14,7 @@ git config merge.ff false                      # merge всегда с merge-к�
 npm i -g @fission-ai/openspec@1.16.0           # та же версия, что сгенерировала скиллы
 openspec config set delivery skills            # только скиллы, без дублирующих slash-команд
 ```
+Обе команды `git config` выполняет человек: `guard.js` не даёт агенту менять `core.hooksPath` и `merge.ff`.
 Хуки Claude Code (`.claude/settings.json`) подключаются сами при открытии проекта. На Windows им нужны
 Git Bash (его требует сам Claude Code) и Node.js в `PATH`.
 
@@ -22,14 +23,14 @@ Git Bash (его требует сам Claude Code) и Node.js в `PATH`.
 | Часть | Где лежит | Что делает | Почему именно так |
 |---|---|---|---|
 | Файл правил | `CLAUDE.md` (`AGENTS.md` ссылается на него) | Подкладывается в контекст на каждом ходу: что за проект, инварианты, ловушки, как проверить | Только то, что агент не узнает из кода (гл. 10). Каждый запрет с причиной (гл. 11) |
-| Спецификации | `openspec/` | Требования и сценарии до кода; изменение проходит propose → apply → archive | Требование преподавателя. Код сверяется со спекой, а не с перепиской |
+| Спецификации | `openspec/` | Требования и сценарии до кода; изменение проходит propose → apply → ревью → archive | Требование преподавателя. Код сверяется со спекой, а не с перепиской |
 | Скиллы OpenSpec | `.claude/skills/openspec-*` | Процедуры propose, apply, explore, update, sync, archive | Сгенерированы `openspec init --tools claude`, мы их не писали. Режим `delivery: skills`, чтобы не было дублей в виде slash-команд |
-| Скилл `code-review` | `.claude/skills/code-review/` | Цикл ревью: раунды до чистого результата, затем «схлопывание» | Нельзя быть себе судьёй (гл. 22) |
+| Скилл `code-review` | `.claude/skills/code-review/` | Цикл ревью: раунды до чистого результата, затем «схлопывание»; исправления каждого раунда записываются задачами в `tasks.md` | Нельзя быть себе судьёй (гл. 22) |
 | Субагент `reviewer` | `.claude/agents/reviewer.md` | Проверяет ветку в чистом контексте по 14 вопросам «да/нет», пишет отчёт | Просьба «оцени качество» даёт вежливую пустоту, работает список вопросов с ответом да или нет (гл. 22) |
 | Хук SessionStart | `.claude/hooks/session-start.sh` | В начале сессии показывает агенту ветку, правки, активные OpenSpec-изменения | Инструкция «прочитай состояние» срабатывает редко, хук всегда (гл. 13) |
-| Хук PreToolUse | `.claude/hooks/guard.js` | Блокирует `down -v`, удаление volumes, force push, `reset --hard`, `git merge` без `--no-ff`, чтение `.env`, правку уже влитых миграций | Необратимые действия закрываем кодом, а не текстом (гл. 13, 24). Агент получает причину отказа и что делать вместо этого |
-| Права | `.claude/settings.json` → `permissions` | Разрешает безопасные команды без подтверждения, запрещает чтение `.env` | Встроенный механизм дешевле своего кода |
-| Git-хуки | `.githooks/` | `pre-commit`: нет коммитов в master/dev и `.env`; `commit-msg`: Conventional Commits; `pre-merge-commit`: в dev не вливается feature/fix без отчёта ревью, в котором последний раунд без blocker и major, пройдено схлопывание, а после коммита с отчётом менялись только `*.md` и `openspec/` (ловит забытые правки, от намеренного обхода не защищает) | Работают одинаково для человека и агента. Последний хук превращает ревью из пожелания в шлюз (гл. 3, п. 8) |
+| Хук PreToolUse | `.claude/hooks/guard.js` | Блокирует `down -v`, удаление volumes, force push, `reset --hard`, `git clean -f`, `git merge` без `--no-ff` или с `--ff`; отключение git-хуков (`--no-verify` и его сокращения, `commit -n`, запись `core.hooksPath`, `merge.ff`, `branch.<имя>.mergeoptions`, `git -c` с ними, переменные `GIT_CONFIG_*`); команду с `.env` (кроме `.env.example` и сообщения `-m` у commit, tag, merge, в том числе heredoc); правку уже влитых миграций: через Edit и Write, а в Bash и PowerShell часть команды с именем влитого changeset, каталогом changelog целиком или глобом в нём, если это не чтение (`cat`, `Get-Content`, `grep`, `ls`, `find`, `git diff/log/show`) и не `git restore`. Новый changeset ветки не трогает | Необратимые действия закрываем кодом, а не текстом (гл. 13, 24). Агент получает причину отказа и что делать вместо этого. Для миграций запрет по умолчанию: способов записать файл больше, чем прочитать. Guard ловит ошибки агента по явному тексту команды, от намеренного обхода (`bash -c`, имя файла по частям, правка `.git/config`) не защищает |
+| Права | `.claude/settings.json` → `permissions` | Разрешает безопасные команды в Bash и PowerShell без подтверждения, запрещает чтение `.env` | Встроенный механизм дешевле своего кода |
+| Git-хуки | `.githooks/` | `pre-commit`: нет коммитов в master/dev и `.env`, а завершение merge в dev после конфликта проходит тот же шлюз, что `pre-merge-commit` (git его в этом случае не вызывает); `commit-msg`: Conventional Commits; `pre-merge-commit`: в dev не вливается feature/fix без отчёта ревью, в котором последний раунд без blocker и major, пройдено схлопывание, а после коммита с отчётом менялись только `*.md` и `openspec/` (ловит забытые правки, от намеренного обхода не защищает); `chore/*` вливается без отчёта, если не меняет `src/`, `pom.xml`, `Dockerfile` и `compose.yaml` (сравнение с merge-base) | Работают одинаково для человека и агента. Последний хук превращает ревью из пожелания в шлюз (гл. 3, п. 8) |
 
 Глобальные инструменты автора, которых нет в репозитории:
 - `antislop-chat`: скилл, убирает из документации признаки ИИ-текста.
@@ -77,10 +78,16 @@ Git Bash (его требует сам Claude Code) и Node.js в `PATH`.
 - Журнал сессий в репозитории: состояние восстанавливается из git, OpenSpec и хука SessionStart.
 - Скилл для миграций Liquibase: формат виден по `001-create-students.sql`, правку применённых changeset
   блокирует `guard.js`, итоговую схему проверяет `MigrationIT` (гл. 10: агент узнаёт это из кода).
+- Повторное ревью после схлопывания: правки по его итогам коммитятся до отчёта с решениями автора,
+  и ревьюер их уже не перепроверяет. Хук видит только, что после коммита с отчётом код не менялся.
 
 ## Как убедиться, что обвязка работает
 ```powershell
 git config core.hooksPath .githooks        # один раз после клонирования
 git switch dev; git commit --allow-empty -m "test: x"            # отказ pre-commit
 '{"tool_name":"Bash","tool_input":{"command":"docker compose down -v"}}' | node .claude/hooks/guard.js   # exit 2
+'{"tool_name":"Bash","tool_input":{"command":"git commit --no-verify -m x"}}' | node .claude/hooks/guard.js   # exit 2
+'{"tool_name":"PowerShell","tool_input":{"command":"Add-Content src/main/resources/db/changelog/001-create-students.sql x"}}' | node .claude/hooks/guard.js   # exit 2
+'{"tool_name":"PowerShell","tool_input":{"command":"Get-Content src/main/resources/db/changelog/001-create-students.sql"}}' | node .claude/hooks/guard.js   # exit 0
 ```
+Код выхода в PowerShell: `$LASTEXITCODE`.
