@@ -36,15 +36,23 @@ const DANGEROUS_COMMANDS = [
   // merge.ff=false это закрывает, но --ff, --ff-only и -c merge.ff=true в команде сильнее настройки.
   [new RegExp(GIT + String.raw`merge(?![\w-])(?!${ARGS}\s--(?:no-ff|abort|continue|quit)\b)`),
     'git merge без --no-ff может пройти fast-forward мимо хука pre-merge-commit. Добавь --no-ff'],
-  [/(?<![\w.-])\.env(?![\w.-])/,
-    'в .env лежат локальные пароли, агент их не читает. Пример значений в .env.example'],
 ];
+
+// .env: блокируется любое упоминание файла в команде, кроме .env.example (запрет по умолчанию:
+// читателей слишком много, от cat до node -e). Сообщение -m/--message правила не видят, если оно
+// в одинарных кавычках или в двойных без $ и `: в "$(cat .env)" оболочка выполнила бы чтение.
+const ENV_FILE = /(?<![\w.-])\.env(?![\w.-])/;
+const MESSAGE = /\s(?:-m|--message)(?:\s+|=)(?:'[^']*'|"[^"$`]*")/g;
 
 // На Windows у Claude Code есть отдельный инструмент PowerShell, команды в нём те же.
 if (call.tool_name === 'Bash' || call.tool_name === 'PowerShell') {
-  const command = call.tool_input.command || '';
+  // Сообщение коммита ничего не выполняет: упоминание .env или флага в нём не повод для отказа.
+  const command = (call.tool_input.command || '').replace(MESSAGE, ' ');
   for (const [pattern, reason] of DANGEROUS_COMMANDS) {
     if (pattern.test(command)) deny(reason);
+  }
+  if (ENV_FILE.test(command)) {
+    deny('в .env лежат локальные пароли, агент их не читает. Пример значений в .env.example');
   }
   process.exit(0);
 }
